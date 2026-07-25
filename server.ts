@@ -34,6 +34,56 @@ function getGeminiClient() {
 // System model for text/JSON generation
 const AI_MODEL = "gemini-2.5-flash";
 
+function extractAndParseJSON(text: string) {
+  if (!text) throw new Error("Empty AI model response");
+  let str = text.trim();
+
+  // 1. Direct JSON parse
+  try {
+    return JSON.parse(str);
+  } catch (e) {
+    // Continue to cleanup
+  }
+
+  // 2. Strip code blocks ```json ... ```
+  if (str.includes("```")) {
+    const stripped = str.replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
+    try {
+      return JSON.parse(stripped);
+    } catch (e) {
+      // Continue to regex extraction
+    }
+  }
+
+  // 3. Extract substring between outer brackets { ... } or [ ... ]
+  const firstBrace = str.indexOf("{");
+  const lastBrace = str.lastIndexOf("}");
+  const firstBracket = str.indexOf("[");
+  const lastBracket = str.lastIndexOf("]");
+
+  let start = -1;
+  let end = -1;
+
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    start = firstBrace;
+    end = lastBrace + 1;
+  } else if (firstBracket !== -1 && lastBracket > firstBracket) {
+    start = firstBracket;
+    end = lastBracket + 1;
+  }
+
+  if (start !== -1 && end !== -1) {
+    const sub = str.substring(start, end);
+    try {
+      return JSON.parse(sub);
+    } catch (e) {
+      // Continue
+    }
+  }
+
+  throw new SyntaxError("Failed to parse valid JSON from AI output");
+}
+
 async function generateAIContentWithFallback(prompt: string, schema?: any) {
   const ai = getGeminiClient();
   const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash"];
@@ -51,16 +101,10 @@ async function generateAIContentWithFallback(prompt: string, schema?: any) {
       });
 
       if (response && response.text) {
-        let cleanText = response.text.trim();
-        // Remove markdown backticks if present
-        if (cleanText.includes("```")) {
-          cleanText = cleanText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-        }
-        return JSON.parse(cleanText);
+        return extractAndParseJSON(response.text);
       }
     } catch (err: any) {
       lastError = err;
-      // Log concise info if model quota or rate limit is encountered
       const isQuota = err?.status === 429 || String(err?.message || "").includes("quota") || String(err?.message || "").includes("429");
       if (isQuota) {
         console.info(`[Gemini AI] Model ${model} rate limited or quota exceeded, attempting next model...`);
@@ -738,37 +782,58 @@ Return strictly valid JSON:
 });
 
 function generateFallbackInterviewReport(payload: any) {
-  const responses = payload.responses || [];
-  const questions = payload.questions || [];
+  const responses: any[] = payload.responses || [];
+  const questions: any[] = payload.questions || [];
   const targetRole = payload.targetRole || "Software Engineer";
-  const totalQuestionsCount = Math.max(1, questions.length || responses.length || 12);
+  const totalQuestionsCount = Math.max(1, questions.length, responses.length);
 
   let totalScore = 0;
   let totalComm = 0;
   let totalTech = 0;
   let totalProb = 0;
 
-  const questionSummaries = responses.map((r: any, idx: number) => {
-    const s = Number(r.evaluation?.score) || 0;
+  const questionSummaries = [];
+
+  for (let i = 0; i < totalQuestionsCount; i++) {
+    const qNum = i + 1;
+    const qObj = questions[i] || {};
+    const resp = responses.find((r: any) => r.questionIndex === qNum || r.questionNumber === qNum) || responses[i];
+
+    let s = 0;
+    let comm = 0;
+    let tech = 0;
+    let prob = 0;
+    let userAnswer = "Unanswered";
+    let feedback = "Question skipped or unanswered.";
+    let verdict = "Unanswered";
+
+    if (resp && resp.userAnswer && resp.userAnswer !== "Unanswered" && !resp.userAnswer.toLowerCase().includes("don't know")) {
+      userAnswer = resp.userAnswer;
+      s = typeof resp.evaluation?.score === "number" ? resp.evaluation.score : 65;
+      comm = typeof resp.evaluation?.communicationScore === "number" ? resp.evaluation.communicationScore : s;
+      tech = typeof resp.evaluation?.technicalAccuracyScore === "number" ? resp.evaluation.technicalAccuracyScore : s;
+      prob = typeof resp.evaluation?.problemSolvingScore === "number" ? resp.evaluation.problemSolvingScore : s;
+      feedback = resp.evaluation?.feedback || "Evaluation recorded.";
+
+      if (s >= 80) verdict = "Strong";
+      else if (s >= 50) verdict = "Average";
+      else verdict = "Needs Work";
+    }
+
     totalScore += s;
-    totalComm += Number(r.evaluation?.communicationScore) || s;
-    totalTech += Number(r.evaluation?.technicalAccuracyScore) || s;
-    totalProb += Number(r.evaluation?.problemSolvingScore) || s;
+    totalComm += comm;
+    totalTech += tech;
+    totalProb += prob;
 
-    let verdict = "Needs Work";
-    if (s >= 80) verdict = "Strong";
-    else if (s >= 50) verdict = "Average";
-    else if (s <= 15 || r.userAnswer === "Unanswered") verdict = "Unanswered";
-
-    return {
-      questionNumber: idx + 1,
-      question: r.question || `Question ${idx + 1}`,
-      candidateAnswerSnippet: r.userAnswer ? (r.userAnswer.length > 50 ? r.userAnswer.substring(0, 50) + "..." : r.userAnswer) : "No answer provided",
+    questionSummaries.push({
+      questionNumber: qNum,
+      question: qObj.question || resp?.question || `Question ${qNum}`,
+      candidateAnswerSnippet: userAnswer.length > 55 ? userAnswer.substring(0, 55) + "..." : userAnswer,
       score: s,
       verdict,
-      keyTakeaway: r.evaluation?.feedback || "Review technical fundamentals for this topic."
-    };
-  });
+      keyTakeaway: feedback
+    });
+  }
 
   const overallScore = Math.min(100, Math.max(0, Math.round(totalScore / totalQuestionsCount)));
   const communicationScore = Math.min(100, Math.max(0, Math.round(totalComm / totalQuestionsCount)));
@@ -781,12 +846,12 @@ function generateFallbackInterviewReport(payload: any) {
   else if (overallScore >= 65) hiringVerdict = "Hire";
   else if (overallScore >= 40) hiringVerdict = "Weak Hire";
 
-  const lowScoring = responses.filter((r: any) => (r.evaluation?.score || 0) < 60);
-  const skillGaps = lowScoring.slice(0, 3).map((r: any) => ({
-    skill: r.question ? (r.question.split(" ").slice(0, 5).join(" ") + "...") : "Technical Mechanism Depth",
-    severity: (r.evaluation?.score || 0) < 20 ? "High" : "Medium",
-    description: `Candidate scored ${r.evaluation?.score || 0}% due to missing technical details or unanswered question.`,
-    howToFix: `Practice articulating trade-offs, architecture, and core mechanics for ${r.question || 'this topic'}.`
+  const lowScoring = questionSummaries.filter((q: any) => q.score < 60);
+  const skillGaps = lowScoring.slice(0, 3).map((q: any) => ({
+    skill: q.question ? (q.question.split(" ").slice(0, 5).join(" ") + "...") : "Technical Mechanism Depth",
+    severity: q.score === 0 ? "High" : "Medium",
+    description: q.score === 0 ? `Question ${q.questionNumber} was unanswered (${q.question}).` : `Candidate scored ${q.score}% on question ${q.questionNumber}.`,
+    howToFix: `Practice articulating trade-offs, architecture, and core mechanics for ${q.question}.`
   }));
 
   if (skillGaps.length === 0) {
@@ -798,7 +863,7 @@ function generateFallbackInterviewReport(payload: any) {
     });
   }
 
-  const answeredCount = responses.filter((r: any) => r.userAnswer && r.userAnswer !== "Unanswered" && r.userAnswer !== "I don't know").length;
+  const answeredCount = questionSummaries.filter((q: any) => q.verdict !== "Unanswered").length;
 
   return {
     overallScore,
@@ -807,10 +872,10 @@ function generateFallbackInterviewReport(payload: any) {
     technicalScore,
     problemSolvingScore,
     starMethodScore,
-    executiveSummary: `Completed ${answeredCount} of ${totalQuestionsCount} questions in mock interview for ${targetRole}. Overall score: ${overallScore}% (${hiringVerdict}). ${lowScoring.length > 0 ? `${lowScoring.length} question(s) flagged for revision.` : 'Demonstrated strong technical readiness.'}`,
+    executiveSummary: `Candidate completed ${answeredCount} of ${totalQuestionsCount} questions in the ${targetRole} mock interview. Calculated overall score: ${overallScore}% (${hiringVerdict}). ${lowScoring.length > 0 ? `${lowScoring.length} question(s) flagged for revision.` : 'Demonstrated strong technical readiness.'}`,
     skillGaps,
     communicationFeedback: {
-      strengths: ["Clear tone and willingness to engage", "Good response structure"],
+      strengths: answeredCount > 0 ? ["Clear tone and willingness to engage", "Good response structure"] : ["Session completed"],
       areasToImprove: ["Avoid skipping or leaving questions unanswered", "Incorporate quantifiable STAR results"]
     },
     whatToImprove: [
@@ -1074,7 +1139,32 @@ Provide direct, actionable, encouraging, and clear career advice, technical expl
       }
       throw new Error("Empty model response");
     } catch (geminiError) {
-      console.warn("Mentor chat fallback triggered:", geminiError);
+      console.warn("Mentor chat JSON generation failed, trying direct text generation:", geminiError);
+      try {
+        const ai = getGeminiClient();
+        const textResponse = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: `You are SkillBridge AI - an expert CS career mentor. Answer the student's question directly, accurately, and thoroughly with clear markdown headings and bullet points.\n\nStudent Question: "${userQuery}"`,
+        });
+        if (textResponse && textResponse.text) {
+          const shortQ = userQuery.slice(0, 35);
+          return res.json({
+            success: true,
+            data: {
+              replyMarkdown: textResponse.text,
+              suggestedFollowUps: [
+                `How do I practice ${shortQ} in a hands-on project?`,
+                `What are common technical interview questions on ${shortQ}?`,
+                `What should my next learning milestone be?`
+              ],
+              keyTakeaway: `Thoroughly understanding ${shortQ} strengthens your technical depth.`
+            }
+          });
+        }
+      } catch (err2) {
+        console.warn("Direct text generation also failed, using dynamic mentor fallback:", err2);
+      }
+
       const dynamicFallback = generateDynamicMentorFallback(userQuery, userContext);
       return res.json({
         success: true,

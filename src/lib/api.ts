@@ -156,55 +156,95 @@ export async function generateInterviewReportAPI(payload: any) {
       body: JSON.stringify(payload),
     });
     const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || "Failed to generate interview report");
+    if (!res.ok || !data.success || !data.data) throw new Error(data.error || "Failed to generate interview report");
     return data.data;
   } catch (err: any) {
     console.warn("Interview report fallback:", err);
-    const responses = payload?.responses || [];
+    const responses: any[] = payload?.responses || [];
     const role = payload?.targetRole || "Software Engineer";
-    const questions = payload?.questions || [];
+    const questions: any[] = payload?.questions || [];
+    const totalQuestionsCount = Math.max(1, questions.length, responses.length);
+
+    let totalScore = 0;
+    let totalComm = 0;
+    let totalTech = 0;
+    let totalProb = 0;
+
+    const questionSummaries = (questions.length > 0 ? questions : responses).map((q: any, i: number) => {
+      const qNum = i + 1;
+      const resp = responses.find((r: any) => r.questionIndex === qNum || r.questionNumber === qNum) || responses[i];
+
+      let s = 0;
+      let comm = 0;
+      let tech = 0;
+      let prob = 0;
+      let userAnswer = "Unanswered";
+      let verdict = "Unanswered";
+
+      if (resp && resp.userAnswer && resp.userAnswer !== "Unanswered" && !resp.userAnswer.toLowerCase().includes("don't know")) {
+        userAnswer = resp.userAnswer;
+        s = typeof resp.evaluation?.score === "number" ? resp.evaluation.score : 65;
+        comm = typeof resp.evaluation?.communicationScore === "number" ? resp.evaluation.communicationScore : s;
+        tech = typeof resp.evaluation?.technicalAccuracyScore === "number" ? resp.evaluation.technicalAccuracyScore : s;
+        prob = typeof resp.evaluation?.problemSolvingScore === "number" ? resp.evaluation.problemSolvingScore : s;
+
+        if (s >= 80) verdict = "Strong";
+        else if (s >= 50) verdict = "Average";
+        else verdict = "Needs Work";
+      }
+
+      totalScore += s;
+      totalComm += comm;
+      totalTech += tech;
+      totalProb += prob;
+
+      return {
+        questionNumber: qNum,
+        question: q.question || resp?.question || `Question ${qNum}`,
+        candidateAnswerSnippet: userAnswer.length > 55 ? userAnswer.slice(0, 55) + "..." : userAnswer,
+        score: s,
+        verdict,
+        keyTakeaway: resp?.evaluation?.feedback || (s === 0 ? "Question unanswered." : "Review core architectural principles for this topic.")
+      };
+    });
+
+    const calculatedOverall = Math.min(100, Math.max(0, Math.round(totalScore / totalQuestionsCount)));
+    const calculatedComm = Math.min(100, Math.max(0, Math.round(totalComm / totalQuestionsCount)));
+    const calculatedTech = Math.min(100, Math.max(0, Math.round(totalTech / totalQuestionsCount)));
+    const calculatedProb = Math.min(100, Math.max(0, Math.round(totalProb / totalQuestionsCount)));
+    const calculatedStar = Math.round((calculatedComm + calculatedProb) / 2);
+
+    let hiringVerdict: "Strong Hire" | "Hire" | "Weak Hire" | "No Hire" = "No Hire";
+    if (calculatedOverall >= 82) hiringVerdict = "Strong Hire";
+    else if (calculatedOverall >= 65) hiringVerdict = "Hire";
+    else if (calculatedOverall >= 40) hiringVerdict = "Weak Hire";
+
+    const lowScoring = questionSummaries.filter((q: any) => q.score < 60);
 
     return {
-      overallScore: responses.length > 0 ? 82 : 75,
-      hiringVerdict: responses.length > 0 ? "Hire" : "Weak Hire",
-      communicationScore: 80,
-      technicalScore: 84,
-      problemSolvingScore: 82,
-      starMethodScore: 78,
-      executiveSummary: `Solid interview evaluation for ${role}. Candidate demonstrated good domain awareness and answered key technical trade-offs clearly.`,
-      skillGaps: [
-        {
-          skill: "System Architecture & Scalability",
-          severity: "Medium",
-          description: "Detailing high-throughput caching strategies and database load balancing.",
-          howToFix: "Practice explaining Redis atomic counters and database read replicas."
-        },
-        {
-          skill: "STAR Method Quantification",
-          severity: "Low",
-          description: "Include specific percentage metrics (e.g. 'reduced latency by 35%').",
-          howToFix: "Format behavioral stories with Situation, Task, Action, and Result."
-        }
-      ],
+      overallScore: calculatedOverall,
+      hiringVerdict,
+      communicationScore: calculatedComm,
+      technicalScore: calculatedTech,
+      problemSolvingScore: calculatedProb,
+      starMethodScore: calculatedStar,
+      executiveSummary: `Mock interview evaluation completed for ${role}. Overall score: ${calculatedOverall}% (${hiringVerdict}). ${lowScoring.length > 0 ? `${lowScoring.length} question(s) require technical improvement.` : 'Demonstrated strong domain competence.'}`,
+      skillGaps: lowScoring.slice(0, 3).map((q: any) => ({
+        skill: q.question ? q.question.split(" ").slice(0, 4).join(" ") + "..." : "Technical Core Mechanics",
+        severity: q.score === 0 ? "High" : "Medium",
+        description: q.score === 0 ? `Question ${q.questionNumber} was unanswered.` : `Scored ${q.score}% on question ${q.questionNumber}.`,
+        howToFix: `Practice articulating trade-offs and underlying architecture for ${q.question}.`
+      })),
       communicationFeedback: {
-        strengths: ["Clear technical vocabulary", "Logical explanation flow"],
-        areasToImprove: ["Mention system metrics in STAR responses", "Elaborate on edge cases"]
+        strengths: ["Clear technical intent", "Engaged with interview session"],
+        areasToImprove: ["Avoid skipping questions", "Quantify project impact with specific metrics"]
       },
       whatToImprove: [
-        "Quantify past project impact with specific throughput metrics",
-        "Practice explaining microservice failure modes and circuit breakers"
+        "Structure behavioral responses using STAR (Situation, Task, Action, Result).",
+        "Detail system architecture and performance trade-offs in technical questions.",
+        "Provide partial technical reasoning rather than leaving questions unanswered."
       ],
-      questionSummaries: questions.map((q: any, i: number) => {
-        const resp = responses.find((r: any) => r.questionIndex === i + 1);
-        return {
-          questionNumber: i + 1,
-          question: q.question || `Question ${i + 1}`,
-          candidateAnswerSnippet: resp?.userAnswer ? resp.userAnswer.slice(0, 100) + "..." : "No answer provided",
-          score: resp?.evaluation?.score || 75,
-          verdict: (resp?.evaluation?.score || 75) >= 80 ? "Strong" : "Needs Work",
-          keyTakeaway: resp?.evaluation?.feedback || "Review core architectural principles for this topic."
-        };
-      })
+      questionSummaries
     };
   }
 }
@@ -218,17 +258,18 @@ export async function sendMentorMessageAPI(payload: any) {
       body: JSON.stringify(payload),
     });
     const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || "Failed to get mentor response");
+    if (!res.ok || !data.success || !data.data) throw new Error(data.error || "Failed to get mentor response");
     return data.data;
   } catch (err: any) {
+    const shortTopic = queryText.length > 40 ? queryText.slice(0, 40) + "..." : queryText;
     return {
-      replyMarkdown: `### 💡 Technical Guidance on "${queryText}"\n\nFocusing on core engineering fundamentals, hands-on production project builds, and articulating your architectural choices clearly during interviews will help you succeed on **"${queryText}"**.\n\n1. **Core Understanding**: Master the underlying mechanics and trade-offs.\n2. **Practical Build**: Implement this concept in a working project.\n3. **Interview Communication**: Be prepared to explain your design decisions cleanly.`,
+      replyMarkdown: `### 💡 Career & Technical Guidance on "${shortTopic}"\n\nRegarding **"${queryText}"**:\n\n1. **Core Architectural Mechanics**: Master the fundamental principles, runtime execution, and system trade-offs behind **"${shortTopic}"**.\n2. **Hands-On Implementation**: Build a standalone project module or integration using **"${shortTopic}"** to validate your practical skills.\n3. **Interview Communication**: Be prepared to explain your design decisions, latency/memory trade-offs, and edge-case handling clearly using the STAR method.`,
       suggestedFollowUps: [
-        `How does ${queryText} apply to real-world production systems?`,
-        `What are common interview questions asked about ${queryText}?`,
-        "What resources or documentation do you recommend?"
+        `How do I explain "${shortTopic}" in a technical interview?`,
+        `What projects can I build to demonstrate "${shortTopic}"?`,
+        `What are common pitfalls or mistakes to avoid with "${shortTopic}"?`
       ],
-      keyTakeaway: `Mastering ${queryText} strengthens your technical depth and career readiness.`,
+      keyTakeaway: `Mastering ${shortTopic} demonstrates technical depth and engineering maturity.`,
     };
   }
 }
