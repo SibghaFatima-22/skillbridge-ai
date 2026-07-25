@@ -845,54 +845,56 @@ Provide direct, actionable, encouraging, and clear career advice, technical expl
 // 7. GitHub Profile Analyzer AI
 app.post("/api/github/analyze", async (req, res) => {
   try {
-    const { username, targetRole = "Full Stack Software Engineer" } = req.body;
+    const { username, targetRole = "Full Stack Software Engineer", clientFetchedUser, clientFetchedRepos } = req.body;
     const cleanUser = (username || "octocat").trim().replace(/^@/, "").replace(/^https?:\/\/github\.com\//, "").replace(/\/$/, "");
 
-    let userDetails: any = null;
-    let reposData: any[] = [];
+    let userDetails: any = clientFetchedUser || null;
+    let reposData: any[] = (Array.isArray(clientFetchedRepos) && clientFetchedRepos.length > 0) ? clientFetchedRepos : [];
 
-    // Attempt real GitHub public API fetch with fast timeout (3s) to prevent function timeout
-    try {
-      const userCtrl = new AbortController();
-      const userTimer = setTimeout(() => userCtrl.abort(), 3000);
-      const userRes = await fetch(`https://api.github.com/users/${cleanUser}`, {
-        headers: {
-          "User-Agent": "SkillBridge-AI-App",
-          "Accept": "application/vnd.github.v3+json"
-        },
-        signal: userCtrl.signal
-      });
-      clearTimeout(userTimer);
-      if (userRes.ok) {
-        userDetails = await userRes.json();
-      }
+    // If client didn't supply repos, attempt server-side GitHub public API fetch
+    if (reposData.length === 0) {
+      try {
+        const userCtrl = new AbortController();
+        const userTimer = setTimeout(() => userCtrl.abort(), 3500);
+        const userRes = await fetch(`https://api.github.com/users/${cleanUser}`, {
+          headers: {
+            "User-Agent": "SkillBridge-AI-App",
+            "Accept": "application/vnd.github.v3+json"
+          },
+          signal: userCtrl.signal
+        });
+        clearTimeout(userTimer);
+        if (userRes.ok) {
+          userDetails = await userRes.json();
+        }
 
-      const reposCtrl = new AbortController();
-      const reposTimer = setTimeout(() => reposCtrl.abort(), 3500);
-      const reposRes = await fetch(`https://api.github.com/users/${cleanUser}/repos?sort=pushed&per_page=15`, {
-        headers: {
-          "User-Agent": "SkillBridge-AI-App",
-          "Accept": "application/vnd.github.v3+json"
-        },
-        signal: reposCtrl.signal
-      });
-      clearTimeout(reposTimer);
-      if (reposRes.ok) {
-        reposData = await reposRes.json();
+        const reposCtrl = new AbortController();
+        const reposTimer = setTimeout(() => reposCtrl.abort(), 4000);
+        const reposRes = await fetch(`https://api.github.com/users/${cleanUser}/repos?sort=pushed&per_page=15`, {
+          headers: {
+            "User-Agent": "SkillBridge-AI-App",
+            "Accept": "application/vnd.github.v3+json"
+          },
+          signal: reposCtrl.signal
+        });
+        clearTimeout(reposTimer);
+        if (reposRes.ok) {
+          reposData = await reposRes.json();
+        }
+      } catch (e) {
+        console.warn("GitHub public API server fetch fallback or timeout:", e);
       }
-    } catch (e) {
-      console.warn("GitHub public API fetch fallback or timeout:", e);
     }
 
     const repoSummaries = reposData.map((r: any) => ({
       name: r.name,
-      description: r.description || "Open source repository codebase",
+      description: r.description || `${r.name} open-source repository`,
       language: r.language || "TypeScript",
-      stars: r.stargazers_count || 0,
-      forks: r.forks_count || 0,
+      stars: r.stargazers_count ?? r.stars ?? 0,
+      forks: r.forks_count ?? r.forks ?? 0,
       topics: r.topics || [],
-      updatedAt: r.updated_at,
-      htmlUrl: r.html_url || `https://github.com/${cleanUser}/${r.name}`
+      updatedAt: r.updated_at || r.pushed_at,
+      htmlUrl: r.html_url || r.htmlUrl || `https://github.com/${cleanUser}/${r.name}`
     }));
 
     const prompt = `You are a Principal Staff Architect and Executive Recruiter performing an in-depth code & portfolio audit on GitHub handle "@${cleanUser}" for target position: "${targetRole}".
@@ -900,21 +902,17 @@ app.post("/api/github/analyze", async (req, res) => {
 GitHub Profile Metadata:
 - Name: ${userDetails?.name || cleanUser}
 - Bio: ${userDetails?.bio || "Software Developer"}
-- Public Repos Count: ${userDetails?.public_repos || (repoSummaries.length > 0 ? repoSummaries.length : 6)}
-- Followers: ${userDetails?.followers || 15}
-- Following: ${userDetails?.following || 8}
+- Public Repos Count: ${userDetails?.public_repos || repoSummaries.length}
+- Followers: ${userDetails?.followers || 0}
+- Following: ${userDetails?.following || 0}
 
-Fetched Repositories (${repoSummaries.length} found):
-${repoSummaries.length > 0 ? JSON.stringify(repoSummaries, null, 2) : "No public repos fetched directly or API limit reached. Evaluate standard representative developer projects for handle @" + cleanUser}
+ACTUAL Fetched Repositories for @${cleanUser} (${repoSummaries.length} found):
+${repoSummaries.length > 0 ? JSON.stringify(repoSummaries, null, 2) : "No public repos found or profile is empty."}
 
-IMPORTANT SCORING RULES:
-1. Compute dynamic, realistic overall metrics specifically tailored to @${cleanUser}:
-   - profileRating (number 50-98)
-   - portfolioScore (number 50-98)
-   - atsScore (number 50-98)
-   - codeQualityScore (number 50-98)
-2. Assign distinct, varied, and realistic scores (e.g. between 65 and 96) for EACH project based on its language relevance to ${targetRole}, documentation depth, stars, forks, and complexity.
-3. NEVER assign identical scores across profiles or projects. Every profile must receive uniquely calculated scores matching their exact portfolio depth.
+CRITICAL REQUIREMENT:
+1. In "projectRatings", you MUST list and evaluate the ACTUAL repositories provided in the list above.
+2. Do NOT invent fake or placeholder repository names (do NOT use "project-name" or "fullstack-app"). Use the exact "name", "description", "language", "stars", "forks", and "htmlUrl" fields from the provided repositories!
+3. If ${repoSummaries.length} repositories are provided, evaluate those exact repositories.
 
 Return strictly valid JSON with this EXACT structure:
 {
@@ -922,9 +920,9 @@ Return strictly valid JSON with this EXACT structure:
   "name": "${userDetails?.name || cleanUser}",
   "avatarUrl": "${userDetails?.avatar_url || `https://github.com/${cleanUser}.png`}",
   "bio": "${userDetails?.bio || "Software Engineer & Open Source Developer"}",
-  "publicReposCount": ${userDetails?.public_repos || (repoSummaries.length > 0 ? repoSummaries.length : 6)},
-  "followersCount": ${userDetails?.followers || 18},
-  "followingCount": ${userDetails?.following || 10},
+  "publicReposCount": ${userDetails?.public_repos || repoSummaries.length},
+  "followersCount": ${userDetails?.followers || 0},
+  "followingCount": ${userDetails?.following || 0},
   "overview": "Clear 2-sentence executive recruiter impression of portfolio strengths for ${targetRole}.",
   "profileRating": 84,
   "developerScore": 84,
@@ -940,13 +938,13 @@ Return strictly valid JSON with this EXACT structure:
   ],
   "projectRatings": [
     {
-      "name": "project-name",
-      "description": "Project functionality description",
-      "language": "TypeScript",
-      "stars": 12,
-      "forks": 3,
-      "score": 92,
-      "htmlUrl": "https://github.com/${cleanUser}/project-name",
+      "name": "${repoSummaries[0]?.name || "real-repo-name"}",
+      "description": "${repoSummaries[0]?.description || "Repository description"}",
+      "language": "${repoSummaries[0]?.language || "TypeScript"}",
+      "stars": ${repoSummaries[0]?.stars || 0},
+      "forks": ${repoSummaries[0]?.forks || 0},
+      "score": 88,
+      "htmlUrl": "${repoSummaries[0]?.htmlUrl || `https://github.com/${cleanUser}`}",
       "strengths": ["Clean modular architecture", "Well-typed async service handlers"],
       "improvements": ["Add Dockerfile for containerization", "Include architecture diagram in README"],
       "resumeBulletSuggestion": "Engineered full-stack web application with React & Node.js, delivering modular REST APIs and 99.9% uptime."
@@ -958,18 +956,11 @@ Return strictly valid JSON with this EXACT structure:
       "importance": "High",
       "reason": "Missing container config files across primary repositories.",
       "recommendation": "Add Dockerfile and docker-compose.yml to top projects."
-    },
-    {
-      "skill": "Automated CI/CD Testing",
-      "importance": "Medium",
-      "reason": "No GitHub Actions test workflows detected.",
-      "recommendation": "Configure .github/workflows/ci.yml for pull-request testing."
     }
   ],
   "improvements": [
     "Add architecture flow diagrams to primary repository READMEs",
-    "Include live deployment links or video preview GIFs in project documentation",
-    "Pin top 3 full-stack projects on GitHub profile overview"
+    "Include live deployment links or video preview GIFs in project documentation"
   ],
   "topStrengths": [
     "Active commit cadence with clear modular component breakdown",
