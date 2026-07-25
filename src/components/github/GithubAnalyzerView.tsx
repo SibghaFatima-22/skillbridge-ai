@@ -54,16 +54,35 @@ export const GitHubAnalyzerView: React.FC<GitHubAnalyzerViewProps> = ({
     const bio = fetchedUser?.bio || `Software Engineer specializing in web applications and open-source projects.`;
     const publicReposCount = fetchedUser?.public_repos ?? (fetchedRepos?.length || 0);
 
+    // Compute dynamic unique scores derived from username, repo count, stars, and followers
+    let seedHash = 0;
+    for (let i = 0; i < cleanUser.length; i++) {
+      seedHash = (seedHash << 5) - seedHash + cleanUser.charCodeAt(i);
+      seedHash |= 0;
+    }
+    const seed = Math.abs(seedHash);
+    const reposList = fetchedRepos || [];
+    const totalStars = reposList.reduce((acc, r) => acc + (r.stargazers_count || r.stars || 0), 0);
+    const followers = fetchedUser?.followers || (seed % 30) + 5;
+
+    const baseScore = 65 + Math.min(18, publicReposCount * 2) + Math.min(10, totalStars * 2) + (seed % 9);
+    const calcProfileRating = Math.min(98, Math.max(68, baseScore));
+    const calcPortfolioScore = Math.min(96, Math.max(64, baseScore - 4 + (seed % 7)));
+    const calcAtsScore = Math.min(97, Math.max(66, baseScore + 2 - (seed % 5)));
+    const calcCodeQualityScore = Math.min(98, Math.max(70, baseScore + 3 - (seed % 6)));
+
     const projectRatings = (fetchedRepos && fetchedRepos.length > 0)
       ? fetchedRepos.slice(0, 8).map((r: any, idx: number) => {
           const lang = r.language || 'TypeScript';
+          const projStars = r.stargazers_count || r.stars || 0;
+          const projScore = Math.min(96, Math.max(72, 75 + projStars * 2 + ((seed + idx * 7) % 15)));
           return {
             name: r.name,
             description: r.description || `${r.name} repository codebase`,
             language: lang,
-            stars: r.stargazers_count || 0,
-            forks: r.forks_count || 0,
-            score: Math.min(95, 78 + (idx % 12)),
+            stars: projStars,
+            forks: r.forks_count || r.forks || 0,
+            score: projScore,
             htmlUrl: r.html_url || `https://github.com/${cleanUser}/${r.name}`,
             strengths: [`Clean codebase structure in ${lang}`, `Active open-source contributions`],
             improvements: ['Add Docker container setup', 'Include architecture flow diagram in README'],
@@ -77,7 +96,7 @@ export const GitHubAnalyzerView: React.FC<GitHubAnalyzerViewProps> = ({
             language: 'TypeScript',
             stars: 18,
             forks: 5,
-            score: 92,
+            score: Math.min(96, 82 + (seed % 12)),
             htmlUrl: `https://github.com/${cleanUser}/${cleanUser}-fullstack-app`,
             strengths: ['Clean modular file structure', 'Type-safe state management & API integration'],
             improvements: ['Add Docker container setup', 'Include architecture flow diagram in README'],
@@ -91,13 +110,13 @@ export const GitHubAnalyzerView: React.FC<GitHubAnalyzerViewProps> = ({
       avatarUrl,
       bio,
       publicReposCount,
-      followersCount: fetchedUser?.followers || 12,
-      followingCount: fetchedUser?.following || 8,
+      followersCount: followers,
+      followingCount: fetchedUser?.following || (seed % 15) + 3,
       overview: `Solid developer portfolio for @${cleanUser} targeting ${targetRole}. Evaluated ${projectRatings.length} project repository codebase(s).`,
-      profileRating: 85,
-      portfolioScore: 82,
-      atsScore: 84,
-      codeQualityScore: 88,
+      profileRating: calcProfileRating,
+      portfolioScore: calcPortfolioScore,
+      atsScore: calcAtsScore,
+      codeQualityScore: calcCodeQualityScore,
       detectedLanguages: [
         { name: 'TypeScript', percentage: 50 },
         { name: 'JavaScript', percentage: 30 },
