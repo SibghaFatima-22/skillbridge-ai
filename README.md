@@ -248,6 +248,11 @@ Provide direct, actionable, encouraging, and clear career advice, technical expl
 | :---: |
 | ![Job Matcher](./src/assets/images/Job_Matcher_preview.png) |
 
+| AI Resume - Builder |
+| :---: |
+| ![Resume Builder](./src/assets/images/AI_Resume_Builder.png) |
+
+
 ---
 
 ## ⚡ Getting Started
