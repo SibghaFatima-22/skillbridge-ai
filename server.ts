@@ -1024,17 +1024,17 @@ Provide direct, actionable, encouraging, and clear career advice, technical expl
     const fullPrompt = `${systemInstruction}\n\nRecent History:\n${formattedHistory}\n\nUser Question: ${userQuery}`;
 
     const mentorSchema = {
-      type: "OBJECT",
-      properties: {
-        replyMarkdown: { type: "STRING" },
-        suggestedFollowUps: {
-          type: "ARRAY",
-          items: { type: "STRING" }
-        },
-        keyTakeaway: { type: "STRING" }
-      },
-      required: ["replyMarkdown", "suggestedFollowUps", "keyTakeaway"]
-    };
+  type: "object",
+  properties: {
+    replyMarkdown: { type: "string" },
+    suggestedFollowUps: {
+      type: "array",
+      items: { type: "string" }
+    },
+    keyTakeaway: { type: "string" }
+  },
+  required: ["replyMarkdown", "suggestedFollowUps", "keyTakeaway"]
+};
 
    try {
       const result = await generateAIContentWithFallback(fullPrompt, mentorSchema);
