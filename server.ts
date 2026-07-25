@@ -851,29 +851,37 @@ app.post("/api/github/analyze", async (req, res) => {
     let userDetails: any = null;
     let reposData: any[] = [];
 
-    // Attempt real GitHub public API fetch
+    // Attempt real GitHub public API fetch with fast timeout (3s) to prevent function timeout
     try {
+      const userCtrl = new AbortController();
+      const userTimer = setTimeout(() => userCtrl.abort(), 3000);
       const userRes = await fetch(`https://api.github.com/users/${cleanUser}`, {
         headers: {
           "User-Agent": "SkillBridge-AI-App",
           "Accept": "application/vnd.github.v3+json"
-        }
+        },
+        signal: userCtrl.signal
       });
+      clearTimeout(userTimer);
       if (userRes.ok) {
         userDetails = await userRes.json();
       }
 
+      const reposCtrl = new AbortController();
+      const reposTimer = setTimeout(() => reposCtrl.abort(), 3500);
       const reposRes = await fetch(`https://api.github.com/users/${cleanUser}/repos?sort=pushed&per_page=15`, {
         headers: {
           "User-Agent": "SkillBridge-AI-App",
           "Accept": "application/vnd.github.v3+json"
-        }
+        },
+        signal: reposCtrl.signal
       });
+      clearTimeout(reposTimer);
       if (reposRes.ok) {
         reposData = await reposRes.json();
       }
     } catch (e) {
-      console.warn("GitHub public API fetch fallback:", e);
+      console.warn("GitHub public API fetch fallback or timeout:", e);
     }
 
     const repoSummaries = reposData.map((r: any) => ({
@@ -1350,3 +1358,4 @@ if (!process.env.VERCEL) {
 }
 
 export default app;
+

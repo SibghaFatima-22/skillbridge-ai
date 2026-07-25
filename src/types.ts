@@ -266,6 +266,8 @@ export interface JobMatch {
   postedDate: string;
   type: string;
   saved?: boolean;
+  bookmarked?: boolean;
+  applyUrl?: string;
 }
 
 export interface MentorMessage {
