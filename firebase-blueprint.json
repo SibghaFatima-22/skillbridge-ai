@@ -1,0 +1,51 @@
+{
+  "entities": {
+    "users": {
+      "title": "User Profile",
+      "description": "User account details, career targets, readiness scores, and preferences",
+      "properties": {
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "university": { "type": "string" },
+        "degree": { "type": "string" },
+        "targetCareer": { "type": "string" },
+        "experienceLevel": { "type": "string" },
+        "careerReadiness": { "type": "number" },
+        "currentStreak": { "type": "number" },
+        "xp": { "type": "number" },
+        "level": { "type": "number" },
+        "theme": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["email", "targetCareer"]
+    },
+    "resumes": {
+      "title": "User Resumes",
+      "description": "User resume data including personal details, experience, projects, and skills",
+      "properties": {
+        "userId": { "type": "string" },
+        "template": { "type": "string" },
+        "personalInfo": { "type": "object" },
+        "summary": { "type": "string" },
+        "experience": { "type": "array" },
+        "projects": { "type": "array" },
+        "skills": { "type": "object" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId"]
+    },
+    "interviews": {
+      "title": "Interview Reports",
+      "description": "Mock interview evaluation reports and question breakdowns",
+      "properties": {
+        "userId": { "type": "string" },
+        "role": { "type": "string" },
+        "type": { "type": "string" },
+        "overallScore": { "type": "number" },
+        "hiringVerdict": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "role"]
+    }
+  }
+}
