@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI } from "@google/genai";
-import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -1570,10 +1569,14 @@ Return strictly valid JSON:
 // Vite Integration for Dev / Static serving for production
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
+   const { createServer } = await import("vite");
+
+const vite = await createServer({
+  server: {
+    middlewareMode: true,
+  },
+  appType: "spa",
+});
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");

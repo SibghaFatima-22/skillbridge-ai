@@ -3,7 +3,6 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI } from "@google/genai";
-import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 dotenv.config();
 var __filename = fileURLToPath(import.meta.url);
@@ -1433,8 +1432,11 @@ Return strictly valid JSON:
 });
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
+    const { createServer } = await import("vite");
+    const vite = await createServer({
+      server: {
+        middlewareMode: true
+      },
       appType: "spa"
     });
     app.use(vite.middlewares);
