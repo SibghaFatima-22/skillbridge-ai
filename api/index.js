@@ -948,14 +948,14 @@ ${formattedHistory}
 
 User Question: ${userQuery}`;
     const mentorSchema = {
-      type: "OBJECT",
+      type: "object",
       properties: {
-        replyMarkdown: { type: "STRING" },
+        replyMarkdown: { type: "string" },
         suggestedFollowUps: {
-          type: "ARRAY",
-          items: { type: "STRING" }
+          type: "array",
+          items: { type: "string" }
         },
-        keyTakeaway: { type: "STRING" }
+        keyTakeaway: { type: "string" }
       },
       required: ["replyMarkdown", "suggestedFollowUps", "keyTakeaway"]
     };
