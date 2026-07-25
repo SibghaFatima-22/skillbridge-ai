@@ -921,121 +921,86 @@ function generateDynamicMentorFallback(query: string, userContext: any = {}) {
   const career = userContext?.careerGoal || userContext?.targetCareer || "Software Engineer";
   const cleanSubject = cleanTopicSubject(q);
 
-  let topicTitle = "";
-  let explanation = "";
+  let replyMarkdown = "";
   let followUps: string[] = [];
-  let takeaway = "";
+  let keyTakeaway = "";
 
   if (lowerQ.includes("project") || lowerQ.includes("portfolio") || lowerQ.includes("github") || lowerQ.includes("build")) {
-    topicTitle = "Portfolio & GitHub Backend Project Strategy";
-    explanation = `Regarding project strategy for an aspiring **${career}**:\n\n` +
-      `1. **Build Production-Grade Full-Stack Applications**: Avoid basic tutorial clones. Focus on real-world capabilities: user authentication (JWT/OAuth), relational or document persistence (PostgreSQL/Firestore), Redis caching, and rate-limiting middleware.\n\n` +
-      `2. **Key Backend Modules**: Pick 1 or 2 high-impact technical features — e.g. implementing background job queues (BullMQ/RabbitMQ) for asynchronous processing, or designing an idempotent webhook integration.\n\n` +
-      `3. **Production README & Documentation**: Every portfolio project must feature an architecture diagram, live deployment URL (Cloud Run/Vercel), Docker setup commands, and API endpoint schema documentation.\n\n` +
-      `4. **Testing & CI/CD**: Include unit tests with Jest/Supertest and set up GitHub Actions to run linters and automated tests on every pull request.`;
+    replyMarkdown = `### 🚀 Recommended Portfolio Projects for ${career}\n\n` +
+      `To stand out to engineering recruiters, avoid basic tutorial clones. Focus on building production-ready projects with real backend depth:\n\n` +
+      `#### 1. Distributed Task Queue & Asynchronous Webhook Gateway\n` +
+      `- **Tech Stack**: Node.js / TypeScript, Express, Redis, BullMQ, PostgreSQL, Docker.\n` +
+      `- **Key Features**: Idempotent webhook processing, rate-limiting middleware, background worker retry queues with exponential backoff, and Prometheus metrics.\n` +
+      `- **Why Recruiters Love It**: Demonstrates non-blocking async architecture, queuing systems, and resilient error recovery under high concurrency.\n\n` +
+      `#### 2. Full-Stack Collaborative Workspace App\n` +
+      `- **Tech Stack**: React, Node.js / Express, WebSockets (Socket.io), Firestore / PostgreSQL, Cloud Run.\n` +
+      `- **Key Features**: User authentication (JWT / OAuth2), real-time document synchronization, role-based access control (RBAC), and automated unit tests with Jest.\n` +
+      `- **Why Recruiters Love It**: Proves full-stack proficiency, state management, security best practices, and live deployment capability.\n\n` +
+      `#### 3. Key Portfolio Best Practices\n` +
+      `- **Comprehensive README**: Include an architecture diagram, setup instructions, API schema docs, and a **live deployed demo URL**.\n` +
+      `- **Testing & CI/CD**: Write unit and integration tests (Supertest) and set up GitHub Actions to run linters on pull requests.`;
     followUps = [
-      `What are 3 unique backend project ideas for a ${career}?`,
-      `How do I write an impressive GitHub README for my portfolio?`,
-      `How do I explain my project architecture in a technical interview?`
+      "How do I write an impressive GitHub README for my portfolio?",
+      "How should I explain my project architecture in a technical interview?",
+      "What are essential unit testing best practices for backend APIs?"
     ];
-    takeaway = "A live deployed full-stack app with containerization, test coverage, and clear architecture documentation is the strongest signal to engineering recruiters.";
+    keyTakeaway = "A live deployed full-stack app with containerization, test coverage, and clear architecture documentation is the strongest hiring signal.";
 
-  } else if (lowerQ.includes("sql") || lowerQ.includes("postgres") || lowerQ.includes("mysql") || lowerQ.includes("database") || lowerQ.includes("query") || lowerQ.includes("index")) {
-    topicTitle = "Database Design & SQL Query Optimization";
-    explanation = `Regarding database optimization for **${cleanSubject}**:\n\n` +
-      `1. **Execution Plan Analysis**: Use \`EXPLAIN ANALYZE\` to identify sequential full-table scans. Add targeted B-Tree indexes on frequently filtered or joined foreign key columns.\n\n` +
-      `2. **Connection Pooling & Concurrency**: Prevent connection exhaustion under peak traffic using connection pooling tools like PgBouncer or Knex/Drizzle connection pools.\n\n` +
-      `3. **ACID Transactions**: Wrap interdependent updates inside database transactions with explicit rollback mechanisms to maintain strict data consistency under concurrent load.`;
-    followUps = [
-      "When should I choose composite multi-column indexes?",
-      "How does PostgreSQL query optimization differ from NoSQL databases?",
-      "How do zero-downtime database migrations work in production?"
-    ];
-    takeaway = "Analyzing EXPLAIN query plans and maintaining proper foreign key indexing prevents system latency bottlenecks under scale.";
-
-  } else if (lowerQ.includes("react") || lowerQ.includes("next") || lowerQ.includes("frontend") || lowerQ.includes("component") || lowerQ.includes("hook") || lowerQ.includes("state")) {
-    topicTitle = "Frontend Architecture & Modern React Development";
-    explanation = `Regarding modern **${career}** frontend architecture:\n\n` +
-      `1. **State & Component Boundaries**: Keep state localized to where it is consumed. Use custom hooks to decouple complex business logic from layout components.\n\n` +
-      `2. **Re-render Optimization**: Stabilize callback dependencies using \`useCallback\` and memoize expensive computations with \`useMemo\`. Avoid declaring component functions inline within render blocks.\n\n` +
-      `3. **Production Performance**: Utilize dynamic code-splitting with React \`lazy\` and \`Suspense\`, optimize image delivery, and eliminate Cumulative Layout Shifts (CLS).`;
-    followUps = [
-      "How do I prevent unnecessary re-renders in large React applications?",
-      "When should I use React Context vs Zustand or Redux?",
-      "How do Server Components differ from Client Components in Next.js?"
-    ];
-    takeaway = "Clean component architecture, memoized callbacks, and decoupled state hooks make frontend applications fast and maintainable.";
-
-  } else if (lowerQ.includes("node") || lowerQ.includes("express") || lowerQ.includes("backend") || lowerQ.includes("rest") || lowerQ.includes("api") || lowerQ.includes("endpoint")) {
-    topicTitle = "Backend Engineering & API Design";
-    explanation = `Regarding **${cleanSubject}** for **${career}** backend architecture:\n\n` +
-      `1. **Non-Blocking Event Loop**: Node.js operates on a single-threaded event loop. Keep route handlers asynchronous and offload heavy CPU operations to worker threads or job queues.\n\n` +
-      `2. **REST Standards & Validation**: Structure endpoints logically using standard HTTP verbs (\`GET\`, \`POST\`, \`PUT\`, \`DELETE\`), return correct HTTP status codes (200, 201, 400, 401, 404, 500), and validate incoming payloads using schemas (Zod/Joi).\n\n` +
-      `3. **Error Middleware**: Implement centralized Express error middleware so async route failures are logged and handled without crashing the server process.`;
-    followUps = [
-      "How do I implement rate limiting and request validation in Express?",
-      "What is the best way to handle asynchronous errors in Express routes?",
-      "How do REST APIs compare to GraphQL and gRPC?"
-    ];
-    takeaway = "Predictable HTTP status codes, schema validation, and centralized error middleware build production-grade APIs.";
-
-  } else if (lowerQ.includes("interview") || lowerQ.includes("behavioral") || lowerQ.includes("tell me about yourself") || lowerQ.includes("mock") || lowerQ.includes("explain")) {
-    topicTitle = "Technical & Behavioral Interview Mastery";
-    explanation = `Regarding **${cleanSubject}** for **${career}** interviews:\n\n` +
-      `1. **STAR Response Structure**: Frame behavioral and project questions using Situation, Task, Action, and Result. Dedicate 70% of your time to your specific technical Actions.\n\n` +
-      `2. **Articulate Trade-offs**: When answering technical design questions, don't just state a single solution — explain trade-offs (e.g. latency vs memory, simplicity vs extensibility).\n\n` +
-      `3. **Quantify Achievements**: Include concrete metrics in your project descriptions (*"reduced query latency by 40%"*, *"achieved 85% unit test coverage"*).`;
+  } else if (lowerQ.includes("prepare") || lowerQ.includes("interview") || lowerQ.includes("behavioral") || lowerQ.includes("tell me about yourself") || lowerQ.includes("mock")) {
+    replyMarkdown = `### 🎯 Technical & Behavioral Interview Preparation Masterclass\n\n` +
+      `Preparing effectively for ${career} interviews requires balancing technical rigor with structured communication:\n\n` +
+      `#### 1. Structure Behavioral & Experience Answers with the STAR Method\n` +
+      `- **Situation & Task**: Set the technical context in 2 sentences (e.g., *"Our API latency spiked to 1.2s under load during a user migration"*).\n` +
+      `- **Action (70% of response)**: Detail your specific engineering contributions (e.g., *"I ran EXPLAIN ANALYZE on PostgreSQL queries, identified missing foreign key indexes, and introduced a Redis caching layer"*).\n` +
+      `- **Result**: Quantify impact with metrics (e.g., *"Reduced P99 latency by 65% and handled 10k concurrent requests"*).\n\n` +
+      `#### 2. Technical & Coding Interview Strategy\n` +
+      `- **Clarify Requirements**: Always ask clarifying questions about traffic scale, latency requirements, and data consistency before writing code.\n` +
+      `- **Speak Your Thought Process**: Never code in silence. Articulate trade-offs out loud (e.g. memory usage vs time complexity).\n` +
+      `- **Check Edge Cases**: Validate empty inputs, boundary conditions, and null values before declaring completion.\n\n` +
+      `#### 3. Efficient Practice Plan\n` +
+      `- Focus on core patterns: Two Pointers, Sliding Window, Graph Traversals (BFS/DFS), and System Design building blocks (Caching, Load Balancing, DB Sharding).`;
     followUps = [
       "Can we do a quick practice mock interview question right now?",
       "How do I answer 'What is your biggest weakness?' effectively?",
       "How should I structure my answer for system design questions?"
     ];
-    takeaway = "Focusing on quantifiable impact, clear STAR structure, and technical trade-offs sets top candidates apart.";
+    keyTakeaway = "Focusing on quantifiable impact, clear STAR response structure, and explicit technical trade-offs sets top candidates apart.";
 
-  } else if (lowerQ.includes("resume") || lowerQ.includes("cv") || lowerQ.includes("ats")) {
-    topicTitle = "ATS Resume Optimization";
-    explanation = `To optimize your resume for **${career}** roles:\n\n` +
-      `1. **Action Verbs & Impact**: Start every bullet point with strong action verbs (*Architected, Engineered, Optimized, Containerized*).\n\n` +
-      `2. **Tech Stack Keyword Match**: Include exact skill keywords from job postings (\`TypeScript\`, \`Node.js\`, \`PostgreSQL\`, \`Docker\`, \`REST APIs\`).\n\n` +
-      `3. **Quantifiable Metrics**: Focus on outcomes over task listings (*"Engineered REST backend serving 10k monthly active users with 99.9% uptime"*).`;
+  } else if (lowerQ.includes("sql") || lowerQ.includes("postgres") || lowerQ.includes("database") || lowerQ.includes("index") || lowerQ.includes("query")) {
+    replyMarkdown = `### 🗄️ PostgreSQL & Database Query Optimization Guide\n\n` +
+      `Optimizing database performance for ${cleanSubject} is a critical backend skill:\n\n` +
+      `1. **Execution Plan Inspection (\`EXPLAIN ANALYZE\`)**: Run \`EXPLAIN ANALYZE\` on slow queries to spot sequential table scans and excessive buffer reads.\n` +
+      `2. **Targeted B-Tree Indexing**: Add composite B-Tree indexes on columns heavily used in \`WHERE\` clauses, \`JOIN\` foreign keys, and \`ORDER BY\` sorting.\n` +
+      `3. **Connection Pooling**: Use PgBouncer or Knex/Drizzle connection pools to prevent connection overhead and exhaustion during high request spikes.\n` +
+      `4. **ACID Transactions**: Wrap interdependent queries inside atomic transactions with explicit rollback logic to guarantee data integrity.`;
     followUps = [
-      "How do I present personal projects if I don't have professional work experience?",
-      "What ATS score should I target before applying?",
-      "How long should a software engineering resume be?"
+      "When should I choose composite multi-column indexes?",
+      "How does PostgreSQL query optimization differ from NoSQL databases?",
+      "How do zero-downtime database migrations work in production?"
     ];
-    takeaway = "Action verbs, exact keyword matching, and quantifiable achievements maximize resume response rates.";
-
-  } else if (lowerQ.includes("system design") || lowerQ.includes("scale") || lowerQ.includes("scalability") || lowerQ.includes("load balancer") || lowerQ.includes("microservice")) {
-    topicTitle = "System Design & Distributed Scalability";
-    explanation = `Regarding **${cleanSubject}** in high-scale system design:\n\n` +
-      `1. **Stateless Compute Tier**: Keep application servers stateless so load balancers (Nginx, ALB) can round-robin incoming traffic across autoscaling container instances.\n\n` +
-      `2. **Caching Strategy**: Implement Redis in front of database read replicas to serve 90%+ of read requests directly from memory with <2ms latency.\n\n` +
-      `3. **Asynchronous Task Workers**: Offload slow, high-latency tasks (notifications, report generation) to background queue workers via RabbitMQ or Kafka.`;
-    followUps = [
-      "How do I estimate storage, bandwidth, and memory requirements during system design interviews?",
-      "What is the difference between strong consistency and eventual consistency?",
-      "How do message queues ensure idempotency?"
-    ];
-    takeaway = "Stateless compute tiers combined with Redis caching and message queue workers enable horizontal scalability.";
+    keyTakeaway = "Analyzing EXPLAIN query plans and maintaining proper foreign key indexing prevents system latency bottlenecks under scale.";
 
   } else {
-    topicTitle = `Guidance on ${cleanSubject}`;
-    explanation = `Here is strategic technical advice regarding **${cleanSubject}** tailored for a **${career}**:\n\n` +
-      `1. **Core Concept Mechanics**: Master the underlying mechanics of **${cleanSubject}** — how it functions at runtime, its architectural role, and its primary benefits.\n\n` +
-      `2. **Practical Hands-On Application**: Implement a working prototype or integration using **${cleanSubject}** in your personal project stack to reinforce your knowledge.\n\n` +
-      `3. **Interview Articulation & Trade-offs**: Be prepared to discuss why you chose **${cleanSubject}** over alternatives, including latency, memory, and maintenance trade-offs.`;
+    replyMarkdown = `### 💡 Strategic Advice on ${cleanSubject}\n\n` +
+      `Regarding **${cleanSubject}** for an aspiring **${career}**:\n\n` +
+      `#### 1. Core Mechanics & Architecture\n` +
+      `Master the underlying mechanics of **${cleanSubject}** — how it executes at runtime, how data flows through the system, and its core design patterns.\n\n` +
+      `#### 2. Practical Hands-On Application\n` +
+      `Build a focused mini-module or integration showcasing **${cleanSubject}** in your portfolio project to demonstrate hands-on experience.\n\n` +
+      `#### 3. Interview Articulation\n` +
+      `Be prepared to explain why you chose **${cleanSubject}** over alternative approaches, highlighting key trade-offs in latency, memory efficiency, and maintainability.`;
     followUps = [
-      `How does ${cleanSubject} apply to real-world production architectures?`,
-      `What are common technical interview questions asked about ${cleanSubject}?`,
-      `What practical project features should I build using ${cleanSubject}?`
+      `What are 3 unique project ideas for ${cleanSubject}?`,
+      `How do I explain ${cleanSubject} in a technical interview?`,
+      `What are key production best practices for ${cleanSubject}?`
     ];
-    takeaway = `Mastering ${cleanSubject} enhances your technical depth and demonstrates strong engineering maturity for ${career} roles.`;
+    keyTakeaway = `Mastering ${cleanSubject} strengthens your technical depth and demonstrates strong engineering maturity for ${career} roles.`;
   }
 
   return {
-    replyMarkdown: `### 💡 ${topicTitle}\n\n${explanation}`,
+    replyMarkdown,
     suggestedFollowUps: followUps,
-    keyTakeaway: takeaway
+    keyTakeaway
   };
 }
 
@@ -1056,15 +1021,23 @@ Provide direct, actionable, encouraging, and clear career advice, technical expl
       ? conversationHistory.map((h: any) => `${h.role || h.sender || "user"}: ${h.text || h.content || ""}`).join("\n")
       : "";
 
-    const fullPrompt = `${systemInstruction}\n\nRecent History:\n${formattedHistory}\n\nUser Question: ${userQuery}\n\nReturn strictly valid JSON with this exact schema:
-{
-  "replyMarkdown": "string mentor answer with markdown formatting directly addressing: '${userQuery}'",
-  "suggestedFollowUps": ["relevant follow-up question 1", "relevant follow-up question 2"],
-  "keyTakeaway": "string main insight"
-}`;
+    const fullPrompt = `${systemInstruction}\n\nRecent History:\n${formattedHistory}\n\nUser Question: ${userQuery}`;
+
+    const mentorSchema = {
+      type: "OBJECT",
+      properties: {
+        replyMarkdown: { type: "STRING" },
+        suggestedFollowUps: {
+          type: "ARRAY",
+          items: { type: "STRING" }
+        },
+        keyTakeaway: { type: "STRING" }
+      },
+      required: ["replyMarkdown", "suggestedFollowUps", "keyTakeaway"]
+    };
 
     try {
-      const result = await generateAIContentWithFallback(fullPrompt);
+      const result = await generateAIContentWithFallback(fullPrompt, mentorSchema);
       if (result && result.replyMarkdown) {
         return res.json({ success: true, data: result });
       }
@@ -1109,6 +1082,9 @@ Provide direct, actionable, encouraging, and clear career advice, technical expl
       data: generateDynamicMentorFallback(userQuery, req.body?.userContext)
     });
   }
+
+    
+  
 });
 
 // 7. GitHub Profile Analyzer AI
@@ -1642,5 +1618,7 @@ if (!process.env.VERCEL) {
 }
 
 export default app;
+
+
 
 
