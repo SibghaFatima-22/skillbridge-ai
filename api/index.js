@@ -66,7 +66,7 @@ async function generateAIContentWithFallback(prompt, schema) {
     throw new Error("GEMINI_API_KEY environment variable is not configured.");
   }
   const ai = getGeminiClient();
-  const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash"];
+  const modelsToTry = ["gemini-2.5-flash"];
   let lastError = null;
   for (const model of modelsToTry) {
     try {
@@ -78,7 +78,7 @@ async function generateAIContentWithFallback(prompt, schema) {
         config
       });
       const timeoutPromise = new Promise(
-        (_, reject) => setTimeout(() => reject(new Error("Gemini request timed out after 30 seconds")), 3e4)
+        (_, reject) => setTimeout(() => reject(new Error("Gemini request timed out after 7 seconds")), 7e3)
       );
       const response = await Promise.race([generatePromise, timeoutPromise]);
       if (response && response.text) {
@@ -88,7 +88,7 @@ async function generateAIContentWithFallback(prompt, schema) {
       lastError = err;
       const isQuota = err?.status === 429 || String(err?.message || "").includes("quota") || String(err?.message || "").includes("429");
       if (isQuota) {
-        console.info(`[Gemini AI] Model ${model} rate limited or quota exceeded, attempting next model...`);
+        console.info(`[Gemini AI] Model ${model} rate limited or quota exceeded.`);
       }
     }
   }
@@ -966,33 +966,7 @@ User Question: ${userQuery}`;
       }
       throw new Error("Empty model response");
     } catch (geminiError) {
-      console.warn("Mentor chat JSON generation failed, trying direct text generation:", geminiError);
-      try {
-        const ai = getGeminiClient();
-        const textResponse = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: `You are SkillBridge AI - an expert CS career mentor. Answer the student's question directly, accurately, and thoroughly with clear markdown headings and bullet points.
-
-Student Question: "${userQuery}"`
-        });
-        if (textResponse && textResponse.text) {
-          const cleanTopic = cleanTopicSubject(userQuery);
-          return res.json({
-            success: true,
-            data: {
-              replyMarkdown: textResponse.text,
-              suggestedFollowUps: [
-                `What are 3 unique project ideas for ${cleanTopic}?`,
-                `How do I explain ${cleanTopic} in a technical interview?`,
-                `What are key production best practices for ${cleanTopic}?`
-              ],
-              keyTakeaway: `Thoroughly understanding ${cleanTopic} strengthens your technical depth.`
-            }
-          });
-        }
-      } catch (err2) {
-        console.warn("Direct text generation also failed, using dynamic mentor fallback:", err2);
-      }
+      console.warn("Mentor chat Gemini generation failed, using dynamic mentor fallback:", geminiError);
       const dynamicFallback = generateDynamicMentorFallback(userQuery, userContext);
       return res.json({
         success: true,
