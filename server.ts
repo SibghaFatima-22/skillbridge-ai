@@ -103,7 +103,7 @@ async function generateAIContentWithFallback(prompt: string, schema?: any) {
       });
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Gemini request timed out after 7 seconds")), 7000)
+        setTimeout(() => reject(new Error("Gemini request timed out after 30 seconds")), 30000)
       );
 
       const response: any = await Promise.race([generatePromise, timeoutPromise]);
@@ -1041,14 +1041,32 @@ Provide direct, actionable, encouraging, and clear career advice, technical expl
         return res.json({ success: true, data: result });
       }
       throw new Error("Empty model response");
-    } catch (geminiError) {
-      console.warn("Mentor chat Gemini generation failed, using dynamic mentor fallback:", geminiError);
-      const dynamicFallback = generateDynamicMentorFallback(userQuery, userContext);
-      return res.json({
+   } catch (geminiError: any) {
+    console.error("======================================");
+    console.error("GEMINI FAILED");
+    console.error(geminiError);
+
+    if (geminiError?.message) {
+        console.error("Message:", geminiError.message);
+    }
+
+    if (geminiError?.status) {
+        console.error("Status:", geminiError.status);
+    }
+
+    if (geminiError?.stack) {
+        console.error(geminiError.stack);
+    }
+
+    console.error("======================================");
+
+    const dynamicFallback = generateDynamicMentorFallback(userQuery, userContext);
+
+    return res.json({
         success: true,
         data: dynamicFallback
-      });
-    }
+    });
+}
   } catch (error: any) {
     const userQuery = req.body?.message || req.body?.query || "Career Guidance";
     res.json({
