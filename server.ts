@@ -51,7 +51,12 @@ async function generateAIContentWithFallback(prompt: string, schema?: any) {
       });
 
       if (response && response.text) {
-        return JSON.parse(response.text);
+        let cleanText = response.text.trim();
+        // Remove markdown backticks if present
+        if (cleanText.includes("```")) {
+          cleanText = cleanText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+        }
+        return JSON.parse(cleanText);
       }
     } catch (err: any) {
       lastError = err;
@@ -822,87 +827,213 @@ function generateDynamicMentorFallback(query: string, userContext: any = {}) {
   const lowerQ = q.toLowerCase();
   const career = userContext?.careerGoal || userContext?.targetCareer || "Software Engineer";
 
-  let topicTitle = "Career & Technical Guidance";
+  let topicTitle = "";
   let explanation = "";
-  let followUps = [
-    "What projects should I build to demonstrate this skill?",
-    "How do I explain this topic during a technical interview?",
-    "What resources or documentation do you recommend?"
-  ];
-  let takeaway = "Focusing on core principles and building hands-on projects accelerates technical growth.";
+  let followUps: string[] = [];
+  let takeaway = "";
 
-  if (lowerQ.includes("interview") || lowerQ.includes("tell me about yourself") || lowerQ.includes("behavioral")) {
-    topicTitle = "Technical & Behavioral Interview Strategy";
-    explanation = `When answering interview questions regarding **${q}** for a **${career}** position:\n\n` +
-      `1. **Use the STAR Method**: Structure your response with Situation, Task, Action, and Result.\n` +
-      `2. **Highlight Technical Architecture**: Explain the specific trade-offs (e.g. latency vs consistency, memory vs execution speed).\n` +
-      `3. **Quantify Your Results**: Mention concrete metrics like *"reduced P95 database query time by 40%"* or *"handled 5,000 concurrent requests"*.`;
+  if (lowerQ.includes("react") || lowerQ.includes("next") || lowerQ.includes("frontend") || lowerQ.includes("component") || lowerQ.includes("hook") || lowerQ.includes("state")) {
+    topicTitle = "Frontend Development & Modern React Architecture";
+    explanation = `Regarding **"${q}"** for modern **${career}** development:\n\n` +
+      `1. **State & Lifecycle Management**: Keep state close to where it is needed. Use custom hooks to decouple business logic from view layout.\n` +
+      `2. **Virtual DOM & Re-render Optimization**: Stabilize callback dependencies with \`useCallback\` and memoize heavy computations with \`useMemo\`. Avoid defining component functions inline inside render blocks.\n` +
+      `3. **Production Performance**: Use dynamic code-splitting with React \`lazy\` and \`Suspense\`, optimize image assets, and minimize layout shifts (CLS).`;
     followUps = [
-      "Can we do a practice mock interview question together?",
-      "How should I structure my response for system design questions?",
-      "What are the top red flags interviewers look for?"
+      "How do I prevent unnecessary re-renders in large React applications?",
+      "When should I use React Context vs Zustand or Redux?",
+      "How do Server Components differ from Client Components in Next.js?"
     ];
-    takeaway = "Clear technical articulation using STAR method and quantifiable impact sets top candidates apart.";
+    takeaway = "Clean component architecture, memoized callbacks, and decoupled state hooks make frontend applications fast and maintainable.";
+
+  } else if (lowerQ.includes("node") || lowerQ.includes("express") || lowerQ.includes("backend") || lowerQ.includes("rest") || lowerQ.includes("api") || lowerQ.includes("endpoint")) {
+    topicTitle = "Backend Engineering & API Design";
+    explanation = `Regarding **"${q}"** for **${career}** backend architecture:\n\n` +
+      `1. **Non-Blocking I/O**: Node.js operates on a single-threaded event loop. Offload heavy CPU-bound tasks to worker threads or background job queues.\n` +
+      `2. **RESTful Standards**: Structure API routes logically using standard HTTP methods (\`GET\`, \`POST\`, \`PUT\`, \`DELETE\`), return appropriate status codes (200, 201, 400, 401, 404, 500), and use JSON schemas for input validation.\n` +
+      `3. **Robust Error Handling**: Implement centralized Express error middleware so async route failures never crash the Node process.`;
+    followUps = [
+      "How do I implement rate limiting and request validation in Express?",
+      "What is the best way to handle asynchronous errors in Express routes?",
+      "How do REST APIs compare to GraphQL and gRPC?"
+    ];
+    takeaway = "Predictable HTTP status codes, schema validation, and centralized error middleware build production-grade APIs.";
+
+  } else if (lowerQ.includes("sql") || lowerQ.includes("postgres") || lowerQ.includes("mysql") || lowerQ.includes("database") || lowerQ.includes("query") || lowerQ.includes("index")) {
+    topicTitle = "Database Design & SQL Performance Tuning";
+    explanation = `Regarding **"${q}"**:\n\n` +
+      `1. **Indexing Strategy**: Use \`EXPLAIN ANALYZE\` to inspect execution plans. Add B-Tree indexes on frequently queried foreign keys and filtering columns to eliminate full table scans.\n` +
+      `2. **Connection Pooling**: Use pooling tools like PgBouncer or Knex/Drizzle connection pools to manage concurrent client connections efficiently under peak load.\n` +
+      `3. **ACID Transactions**: Group interdependent database updates inside transactions with rollback logic to prevent data corruption.`;
+    followUps = [
+      "When should I choose composite multi-column indexes?",
+      "How does PostgreSQL query optimization differ from MySQL?",
+      "How do database migrations work in zero-downtime deployments?"
+    ];
+    takeaway = "Analyzing EXPLAIN query plans and maintaining foreign key indexing prevents latency bottlenecks under scale.";
+
+  } else if (lowerQ.includes("nosql") || lowerQ.includes("mongo") || lowerQ.includes("firestore") || lowerQ.includes("dynamo")) {
+    topicTitle = "NoSQL & Document Database Architecture";
+    explanation = `Regarding **"${q}"**:\n\n` +
+      `1. **Schema Design by Access Pattern**: In NoSQL, design your document schemas around how data is read, rather than how it is stored.\n` +
+      `2. **Denormalization vs References**: Embed small, bounded sub-documents for fast 1-query reads; use references for large or rapidly growing collections.\n` +
+      `3. **Index Coverage**: Ensure every compound query filter in Firestore or MongoDB has a corresponding composite index defined.`;
+    followUps = [
+      "How do I choose between relational SQL and document NoSQL databases?",
+      "How do Firestore security rules protect client-side reads and writes?",
+      "How do I handle eventual consistency in NoSQL systems?"
+    ];
+    takeaway = "NoSQL schemas should be modeled directly around application read patterns to minimize query round-trips.";
+
+  } else if (lowerQ.includes("system design") || lowerQ.includes("scale") || lowerQ.includes("scalability") || lowerQ.includes("load balancer") || lowerQ.includes("microservice")) {
+    topicTitle = "System Design & Distributed Scalability";
+    explanation = `Regarding **"${q}"** in high-scale system design:\n\n` +
+      `1. **Stateless App Tier**: Keep application servers stateless so a Load Balancer (Nginx, ALB) can round-robin incoming requests across multiple autoscaling instances.\n` +
+      `2. **Caching & Data Tier**: Implement Redis in front of PostgreSQL to serve 90%+ of read requests from memory with <2ms latency.\n` +
+      `3. **Asynchronous Processing**: Offload slow tasks (notifications, report generation, video processing) to background queue workers via RabbitMQ or Kafka.`;
+    followUps = [
+      "How do I estimate storage, bandwidth, and memory requirements during system design interviews?",
+      "What is the difference between strong consistency and eventual consistency?",
+      "How do message queues ensure idempotency?"
+    ];
+    takeaway = "Stateless compute tiers combined with Redis caching and message queue workers enable horizontal scalability.";
+
+  } else if (lowerQ.includes("redis") || lowerQ.includes("cache") || lowerQ.includes("caching")) {
+    topicTitle = "Caching Strategies & Memory Store Optimization";
+    explanation = `Regarding **"${q}"**:\n\n` +
+      `1. **Cache-Aside Pattern**: Look up keys in Redis first. On cache miss, read from database, populate Redis with TTL, and return payload to client.\n` +
+      `2. **Invalidation Strategy**: Set conservative Time-To-Live (TTL) expiration on keys and trigger explicit cache invalidation on write/update mutations.\n` +
+      `3. **Stampede Prevention**: Use distributed locking or probabilistic early expiration to prevent thousands of concurrent requests from hitting the DB when a cache key expires.`;
+    followUps = [
+      "What Redis data structures should I use for rate limiters and leaderboards?",
+      "How do LRU and LFU eviction policies work in Redis?",
+      "What are the trade-offs of write-through vs write-behind caching?"
+    ];
+    takeaway = "Cache-aside with strict TTL expiration protects primary databases while delivering sub-millisecond response times.";
+
+  } else if (lowerQ.includes("dsa") || lowerQ.includes("algorithm") || lowerQ.includes("leetcode") || lowerQ.includes("array") || lowerQ.includes("tree") || lowerQ.includes("graph") || lowerQ.includes("big o") || lowerQ.includes("dp") || lowerQ.includes("dynamic programming")) {
+    topicTitle = "Data Structures & Algorithms Mastery";
+    explanation = `Regarding **"${q}"** for coding interviews:\n\n` +
+      `1. **Pattern Recognition**: Master the core problem patterns — Two Pointers, Sliding Window, Fast/Slow Pointers, BFS/DFS, and Memoized Dynamic Programming.\n` +
+      `2. **Complexity Analysis**: Always analyze both Time Complexity $O(N)$ and Space Complexity $O(1)$ before writing code. Speak your thought process aloud.\n` +
+      `3. **Edge Case Checking**: Test edge cases before submitting — empty inputs, single element arrays, duplicate values, and boundary values.`;
+    followUps = [
+      "How do I recognize when to use BFS vs DFS in graph problems?",
+      "What is the best way to transition from brute force to optimal $O(N)$ solutions?",
+      "How many LeetCode problems should I solve to be interview ready?"
+    ];
+    takeaway = "Mastering fundamental patterns (sliding window, binary search, graph traversals) is far more effective than memorizing solutions.";
+
+  } else if (lowerQ.includes("docker") || lowerQ.includes("kubernetes") || lowerQ.includes("container") || lowerQ.includes("devops") || lowerQ.includes("ci/cd") || lowerQ.includes("deploy")) {
+    topicTitle = "DevOps, Containerization & CI/CD Pipelines";
+    explanation = `Regarding **"${q}"**:\n\n` +
+      `1. **Multi-Stage Builds**: Use multi-stage Dockerfiles to compile source code in a builder image and copy only production artifacts into a slim runtime container.\n` +
+      `2. **Environment Parity**: Run identical container builds across local development, staging tests, and Cloud Run production to eliminate "works on my machine" bugs.\n` +
+      `3. **Automated Deployment**: Set up GitHub Actions to run test linter checks on every pull request and auto-deploy container images on main branch merge.`;
+    followUps = [
+      "How do I write a minimal Node.js Dockerfile for production?",
+      "How do health checks and zero-downtime rollouts work in Cloud Run?",
+      "How do I safely manage secrets and environment variables in containerized apps?"
+    ];
+    takeaway = "Slim multi-stage Docker builds paired with automated CI/CD pipelines ensure fast, safe, repeatable deployments.";
+
+  } else if (lowerQ.includes("security") || lowerQ.includes("auth") || lowerQ.includes("oauth") || lowerQ.includes("jwt") || lowerQ.includes("token") || lowerQ.includes("cors") || lowerQ.includes("xss") || lowerQ.includes("csrf")) {
+    topicTitle = "Application Security, Authentication & OAuth";
+    explanation = `Regarding **"${q}"**:\n\n` +
+      `1. **Token Security**: Store sensitive access/refresh tokens in \`HttpOnly\`, \`Secure\`, \`SameSite=Lax\` cookies rather than browser \`localStorage\` to protect against XSS token theft.\n` +
+      `2. **Input Sanitization & Parameterization**: Never concatenate user input into database queries or raw HTML. Use parameterized SQL queries and escape user output.\n` +
+      `3. **OAuth 2.0 Auth Flow**: Implement standard OAuth authorization code flow with PKCE for secure third-party login integration.`;
+    followUps = [
+      "What is the difference between authentication and authorization?",
+      "How do refresh token rotation mechanisms prevent token hijacking?",
+      "How do I configure CORS safely for my frontend and backend domains?"
+    ];
+    takeaway = "Storing tokens in HttpOnly cookies and using parameterized SQL queries prevents the most common OWASP web vulnerabilities.";
+
+  } else if (lowerQ.includes("testing") || lowerQ.includes("jest") || lowerQ.includes("unit") || lowerQ.includes("integration test") || lowerQ.includes("cypress") || lowerQ.includes("playwright")) {
+    topicTitle = "Automated Testing & Quality Assurance";
+    explanation = `Regarding **"${q}"**:\n\n` +
+      `1. **The Test Pyramid**: Write many fast unit tests for utility logic, medium integration tests for API endpoints & database queries, and a few end-to-end user flows.\n` +
+      `2. **Isolation & Mocking**: Mock external third-party HTTP calls and email services so unit tests run fast and deterministically.\n` +
+      `3. **CI Check Gates**: Block pull request merges automatically if test suites or code coverage thresholds fail.`;
+    followUps = [
+      "How do I write unit tests for Express route handlers using Jest and Supertest?",
+      "What is the ideal code coverage percentage to aim for?",
+      "When should I mock a database versus using an in-memory test database?"
+    ];
+    takeaway = "A fast, automated test suite gives engineering teams confidence to refactor and deploy code frequently.";
+
+  } else if (lowerQ.includes("interview") || lowerQ.includes("behavioral") || lowerQ.includes("tell me about yourself") || lowerQ.includes("mock")) {
+    topicTitle = "Technical & Behavioral Interview Strategy";
+    explanation = `Regarding **"${q}"** for **${career}** interviews:\n\n` +
+      `1. **Structure with STAR**: Use Situation, Task, Action, and Result for behavioral questions. Spend 70% of your time on your specific technical Actions.\n` +
+      `2. **Explain Trade-offs**: When answering technical questions, don't just give the solution — explain trade-offs (e.g. latency vs memory, complexity vs readability).\n` +
+      `3. **Quantify Your Impact**: Include metrics in your answers (*"reduced query runtime by 35%"*, *"improved test coverage to 85%"*).`;
+    followUps = [
+      "Can we do a quick practice question right now?",
+      "How do I answer 'What is your biggest weakness?' effectively?",
+      "How should I structure my answer for system design questions?"
+    ];
+    takeaway = "Focusing on quantifiable impact, clear STAR structure, and technical trade-offs sets top candidates apart.";
+
   } else if (lowerQ.includes("resume") || lowerQ.includes("cv") || lowerQ.includes("ats")) {
     topicTitle = "ATS Resume Optimization";
     explanation = `To optimize your resume for **${career}** roles:\n\n` +
-      `1. **Action-Oriented Bullet Points**: Begin each bullet with strong verbs (*Architected, Deployed, Engineered, Optimized*).\n` +
-      `2. **Keyword Match**: Include essential tech stack keywords such as *TypeScript, Docker, PostgreSQL, REST APIs, and System Design*.\n` +
-      `3. **Showcase Measurable Outcomes**: Focus on outcomes over duty descriptions.`;
+      `1. **Action Verbs & Impact**: Start every bullet with strong action verbs (*Architected, Engineered, Optimized, Containerized*).\n` +
+      `2. **Tech Stack Keywords**: Include exact skill keywords from job descriptions (\`TypeScript\`, \`Node.js\`, \`PostgreSQL\`, \`Docker\`, \`REST APIs\`).\n` +
+      `3. **Quantifiable Metrics**: Focus on outcomes over task listings (*"Engineered REST backend serving 10k monthly active users with 99.9% uptime"*).`;
     followUps = [
-      "How do I highlight personal projects if I don't have internship experience?",
-      "What ATS score should I aim for on my resume?",
-      "How do I present my GitHub repositories on my resume?"
+      "How do I present personal projects if I don't have professional work experience?",
+      "What ATS score should I target before applying?",
+      "How long should a software engineering resume be?"
     ];
-    takeaway = "Action verbs paired with quantifiable impact metrics maximize ATS screening pass rates.";
+    takeaway = "Action verbs, exact keyword matching, and quantifiable achievements maximize resume response rates.";
+
   } else if (lowerQ.includes("project") || lowerQ.includes("portfolio") || lowerQ.includes("github")) {
-    topicTitle = "Portfolio & GitHub Project Mastery";
-    explanation = `For **${q}** as an aspiring **${career}**:\n\n` +
-      `1. **Build Full-Stack Microservices**: Avoid basic tutorial clones. Build production-ready services with database indexing and caching.\n` +
-      `2. **Comprehensive README Documentation**: Include an architecture flow diagram, API documentation, and a live deployment preview link.\n` +
-      `3. **Clean Code & Testing**: Include containerization (Dockerfile) and CI/CD test workflows.`;
+    topicTitle = "Portfolio & GitHub Showcase Strategy";
+    explanation = `Regarding **"${q}"** for an aspiring **${career}**:\n\n` +
+      `1. **Build Real Full-Stack Apps**: Avoid basic tutorial clones. Build full-stack applications with user authentication, database persistence, and API integration.\n` +
+      `2. **Production README**: Write comprehensive README files with system architecture diagrams, live demo links, setup commands, and feature lists.\n` +
+      `3. **Deploy & Containerize**: Include a \`Dockerfile\` and deploy your live app to Cloud Run or Vercel with a public link.`;
     followUps = [
       "What are 3 unique project ideas for my portfolio?",
-      "How do I write an impressive GitHub README?",
-      "Should I include live demo URLs for every project?"
+      "How do I create a impressive GitHub profile README?",
+      "Should I include test suites in my portfolio projects?"
     ];
-    takeaway = "A well-documented, deployed repository with clean architecture is the strongest hiring signal.";
-  } else if (lowerQ.includes("sql") || lowerQ.includes("postgres") || lowerQ.includes("database") || lowerQ.includes("query")) {
-    topicTitle = "Database & Persistence Strategy";
-    explanation = `Regarding **${q}**:\n\n` +
-      `1. **Indexing & Query Planning**: Use EXPLAIN ANALYZE to identify sequential scans and optimize composite indexes.\n` +
-      `2. **Connection Pooling**: Implement pooling (e.g. PgBouncer) to prevent connection exhaustion under heavy concurrency.\n` +
-      `3. **ACID & Normalization**: Maintain data integrity while understanding when to selectively denormalize for read performance.`;
+    takeaway = "A live deployed full-stack app with clean code, testing, and a great README is the ultimate hiring signal.";
+
+  } else if (lowerQ.includes("career") || lowerQ.includes("internship") || lowerQ.includes("job") || lowerQ.includes("apply") || lowerQ.includes("salary") || lowerQ.includes("offer")) {
+    topicTitle = "Career Strategy, Networking & Job Search";
+    explanation = `Regarding **"${q}"** for your journey as a **${career}**:\n\n` +
+      `1. **Targeted Applications**: Quality beats quantity. Send targeted applications with customized resume bullet points over spamming generic portals.\n` +
+      `2. **Proactive Networking**: Connect with alumni, senior engineers, and tech recruiters on LinkedIn. Ask thoughtful questions about their engineering stack.\n` +
+      `3. **Continuous Skill Building**: Dedicate 1 hour daily to solving interview practice questions and building portfolio features.`;
     followUps = [
-      "When should I choose SQL vs NoSQL databases?",
-      "How does Redis caching complement PostgreSQL?",
-      "What are database migration best practices?"
+      "How do I request a LinkedIn referral from an engineer?",
+      "How should I negotiate my first entry-level software engineering offer?",
+      "What skills are most in-demand for software engineers this year?"
     ];
-    takeaway = "Understanding query execution plans and indexing strategy is crucial for high-scale backend engineering.";
-  } else if (lowerQ.includes("docker") || lowerQ.includes("cloud") || lowerQ.includes("deploy") || lowerQ.includes("kubernetes")) {
-    topicTitle = "Cloud Infrastructure & Containerization";
-    explanation = `Regarding **${q}**:\n\n` +
-      `1. **Container Isolation**: Multi-stage Docker builds reduce container image sizes and remove unnecessary build dependencies.\n` +
-      `2. **Environment Parity**: Containerization ensures your app behaves identically across dev, staging, and Cloud Run production.\n` +
-      `3. **Automated Pipelines**: Trigger automated builds and deployments via GitHub Actions workflows on pull-request merge.`;
-    followUps = [
-      "How do I set up a multi-stage Dockerfile for Node.js?",
-      "What is the simplest way to deploy containers for free?",
-      "How do environment variables and secrets work in production?"
-    ];
-    takeaway = "Containerization and automated CI/CD deployment pipelines are essential skills for modern software engineering.";
+    takeaway = "Pairing consistent technical practice with strategic networking opens doors much faster than cold applications alone.";
+
   } else {
-    topicTitle = `Guidance on ${q.length > 40 ? q.slice(0, 40) + '...' : q}`;
-    explanation = `Here is strategic advice regarding **"${q}"** for your journey towards becoming a **${career}**:\n\n` +
-      `1. **Core Understanding**: Master the foundational concepts and trade-offs behind this topic.\n` +
-      `2. **Practical Implementation**: Apply this knowledge by building a standalone prototype or integration.\n` +
-      `3. **Technical Communication**: Be prepared to explain your design decisions, edge cases, and performance considerations.`;
+    // Dynamic Query Parsing for any novel topic
+    const cleanWords = q
+      .replace(/[^a-zA-Z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !["how", "what", "can", "you", "tell", "about", "the", "for", "with", "and", "does", "explain", "give", "help", "need", "should"].includes(w.toLowerCase()));
+
+    const keyTopicSubject = cleanWords.length > 0 ? cleanWords.slice(0, 4).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ") : q;
+
+    topicTitle = `Guidance on ${keyTopicSubject}`;
+    explanation = `Here is strategic technical advice regarding **"${q}"** tailored for a **${career}**:\n\n` +
+      `1. **Core Concept Mastery**: Understand the underlying mechanics of **${keyTopicSubject}** — how it functions at runtime, its architectural role, and its primary benefits.\n` +
+      `2. **Practical Hands-On Application**: Implement a working prototype or module using **${keyTopicSubject}** in your personal project stack to reinforce your knowledge.\n` +
+      `3. **Interview Articulation & Trade-offs**: Be prepared to discuss why you would choose **${keyTopicSubject}** over alternatives, including performance, memory, and maintenance trade-offs.`;
     followUps = [
-      `How does ${q} apply to real-world production systems?`,
-      "What are the most common interview questions on this topic?",
-      "What should my next learning step be?"
+      `How does ${keyTopicSubject} apply to real-world production architectures?`,
+      `What are the most common interview questions asked about ${keyTopicSubject}?`,
+      `What practical project features should I build using ${keyTopicSubject}?`
     ];
-    takeaway = `Mastering ${q} strengthens your technical depth and career readiness as a ${career}.`;
+    takeaway = `Mastering ${keyTopicSubject} enhances your technical depth and demonstrates strong engineering maturity for ${career} roles.`;
   }
 
   return {
@@ -1490,5 +1621,6 @@ if (!process.env.VERCEL) {
 }
 
 export default app;
+
 
 

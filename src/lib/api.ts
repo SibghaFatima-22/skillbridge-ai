@@ -210,6 +210,7 @@ export async function generateInterviewReportAPI(payload: any) {
 }
 
 export async function sendMentorMessageAPI(payload: any) {
+  const queryText = payload?.message || payload?.query || "software engineering concepts";
   try {
     const res = await fetch("/api/mentor/chat", {
       method: "POST",
@@ -221,9 +222,13 @@ export async function sendMentorMessageAPI(payload: any) {
     return data.data;
   } catch (err: any) {
     return {
-      replyMarkdown: "That is a great career question! Focusing on building real-world projects with Docker, Redis, and TypeScript is the fastest way to stand out to recruiters. Let's break this down into 3 actionable steps...",
-      suggestedFollowUps: ["How do I deploy my Express app to Cloud Run?", "Can you review my GitHub README format?"],
-      keyTakeaway: "Projects + Clean Documentation = Recruiter Responses.",
+      replyMarkdown: `### 💡 Technical Guidance on "${queryText}"\n\nFocusing on core engineering fundamentals, hands-on production project builds, and articulating your architectural choices clearly during interviews will help you succeed on **"${queryText}"**.\n\n1. **Core Understanding**: Master the underlying mechanics and trade-offs.\n2. **Practical Build**: Implement this concept in a working project.\n3. **Interview Communication**: Be prepared to explain your design decisions cleanly.`,
+      suggestedFollowUps: [
+        `How does ${queryText} apply to real-world production systems?`,
+        `What are common interview questions asked about ${queryText}?`,
+        "What resources or documentation do you recommend?"
+      ],
+      keyTakeaway: `Mastering ${queryText} strengthens your technical depth and career readiness.`,
     };
   }
 }
