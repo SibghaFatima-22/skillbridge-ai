@@ -261,15 +261,17 @@ export async function sendMentorMessageAPI(payload: any) {
     if (!res.ok || !data.success || !data.data) throw new Error(data.error || "Failed to get mentor response");
     return data.data;
   } catch (err: any) {
-    let cleanTopic = queryText.trim()
-      .replace(/["'“”]/g, "")
-      .replace(/^(how do i|what are|what is|how to|tell me about|can you|explain|what projects|how can i|what should i|why is|why do)/gi, "")
-      .replace(/(in a technical interview|for a software engineer|for a backend engineer|in an interview|for cs students|to avoid|pitfalls|mistakes|for scale|in production|with|about)\??$/gi, "")
-      .trim();
+    let cleanTopic = queryText.trim().replace(/["'“”`]/g, " ");
+    let prev = "";
+    while (cleanTopic !== prev) {
+      prev = cleanTopic;
+      cleanTopic = cleanTopic.replace(/^(how do i|what are|what is|how to|tell me about|can you|explain|what projects|how can i|what should i|why is|why do|what are common pitfalls|pitfalls or mistakes to avoid with|what projects can i build|how do i explain)\s*/gi, "");
+    }
+    cleanTopic = cleanTopic.replace(/(in a technical interview|for a software engineer|for a backend engineer|in an interview|for cs students|to avoid|pitfalls|mistakes|for scale|in production|with|about)\??$/gi, "").trim();
 
-    const topicWords = cleanTopic.split(/\s+/).filter((w: string) => w.length > 2 && !["how", "what", "can", "you", "tell", "about", "the", "for", "with", "and", "does", "explain", "give", "help", "need", "should"].includes(w.toLowerCase()));
+    const topicWords = cleanTopic.split(/\s+/).filter((w: string) => w.length > 2 && !["how", "what", "can", "you", "tell", "about", "the", "for", "with", "and", "does", "explain", "give", "help", "need", "should", "avoid", "pitfalls", "common", "demonstrate", "build"].includes(w.toLowerCase()));
     const topicSubject = topicWords.length > 0
-      ? topicWords.slice(0, 4).map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ")
+      ? topicWords.slice(0, 3).map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ")
       : "Backend Engineering";
 
     return {
@@ -397,5 +399,6 @@ export async function getDashboardInsightsAPI(userStats: any) {
     };
   }
 }
+
 
 

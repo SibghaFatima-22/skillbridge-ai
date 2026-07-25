@@ -104,7 +104,7 @@ async function generateAIContentWithFallback(prompt: string, schema?: any) {
       });
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Gemini request timed out after 5 seconds")), 5000)
+        setTimeout(() => reject(new Error("Gemini request timed out after 30 seconds")), 30000)
       );
 
       const response: any = await Promise.race([generatePromise, timeoutPromise]);
@@ -898,15 +898,19 @@ function generateFallbackInterviewReport(payload: any) {
 
 function cleanTopicSubject(rawQuery: string): string {
   let s = String(rawQuery || "").trim();
-  s = s.replace(/["'“”]/g, " ");
-  s = s.replace(/^(how do i|what are|what is|how to|tell me about|can you|explain|what projects|how can i|what should i|why is|why do)/gi, "");
+  s = s.replace(/["'“”`]/g, " ");
+  let prev = "";
+  while (s !== prev) {
+    prev = s;
+    s = s.replace(/^(how do i|what are|what is|how to|tell me about|can you|explain|what projects|how can i|what should i|why is|why do|what are common pitfalls|pitfalls or mistakes to avoid with|what projects can i build|how do i explain)\s*/gi, "");
+  }
   s = s.replace(/(in a technical interview|for a software engineer|for a backend engineer|in an interview|for cs students|to avoid|pitfalls|mistakes|for scale|in production|with|about)\??$/gi, "");
   s = s.trim();
 
-  const words = s.split(/\s+/).filter(w => w.length > 2 && !["how", "what", "can", "you", "tell", "about", "the", "for", "with", "and", "does", "explain", "give", "help", "need", "should", "avoid", "pitfalls", "common"].includes(w.toLowerCase()));
+  const words = s.split(/\s+/).filter(w => w.length > 2 && !["how", "what", "can", "you", "tell", "about", "the", "for", "with", "and", "does", "explain", "give", "help", "need", "should", "avoid", "pitfalls", "common", "demonstrate", "build"].includes(w.toLowerCase()));
 
   if (words.length > 0) {
-    return words.slice(0, 4).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+    return words.slice(0, 3).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
   }
   return "Backend Engineering";
 }
@@ -1074,17 +1078,17 @@ Provide direct, actionable, encouraging, and clear career advice, technical expl
           contents: `You are SkillBridge AI - an expert CS career mentor. Answer the student's question directly, accurately, and thoroughly with clear markdown headings and bullet points.\n\nStudent Question: "${userQuery}"`,
         });
         if (textResponse && textResponse.text) {
-          const shortQ = userQuery.slice(0, 35);
+          const cleanTopic = cleanTopicSubject(userQuery);
           return res.json({
             success: true,
             data: {
               replyMarkdown: textResponse.text,
               suggestedFollowUps: [
-                `How do I practice ${shortQ} in a hands-on project?`,
-                `What are common technical interview questions on ${shortQ}?`,
-                `What should my next learning milestone be?`
+                `What are 3 unique project ideas for ${cleanTopic}?`,
+                `How do I explain ${cleanTopic} in a technical interview?`,
+                `What are key production best practices for ${cleanTopic}?`
               ],
-              keyTakeaway: `Thoroughly understanding ${shortQ} strengthens your technical depth.`
+              keyTakeaway: `Thoroughly understanding ${cleanTopic} strengthens your technical depth.`
             }
           });
         }
