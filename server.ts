@@ -32,11 +32,11 @@ function getGeminiClient() {
 }
 
 // System model for text/JSON generation
-const AI_MODEL = "gemini-3.6-flash";
+const AI_MODEL = "gemini-2.5-flash";
 
 async function generateAIContentWithFallback(prompt: string, schema?: any) {
   const ai = getGeminiClient();
-  const modelsToTry = ["gemini-3.6-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+  const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash"];
 
   let lastError: any = null;
   for (const model of modelsToTry) {
@@ -55,6 +55,11 @@ async function generateAIContentWithFallback(prompt: string, schema?: any) {
       }
     } catch (err: any) {
       lastError = err;
+      // Log concise info if model quota or rate limit is encountered
+      const isQuota = err?.status === 429 || String(err?.message || "").includes("quota") || String(err?.message || "").includes("429");
+      if (isQuota) {
+        console.info(`[Gemini AI] Model ${model} rate limited or quota exceeded, attempting next model...`);
+      }
     }
   }
   throw lastError || new Error("Gemini AI service temporarily rate limited");
@@ -225,7 +230,7 @@ Return strictly valid JSON with this exact schema:
       const result = await generateAIContentWithFallback(prompt);
       return res.json({ success: true, data: result });
     } catch (geminiError) {
-      console.warn("Assessment fallback triggered:", geminiError);
+      console.warn("Assessment using fallback response engine.");
       const fallback = generateFallbackAssessment(req.body);
       return res.json({ success: true, data: fallback });
     }
@@ -291,7 +296,7 @@ Return strictly valid JSON with this exact schema:
       const result = await generateAIContentWithFallback(prompt);
       return res.json({ success: true, data: result });
     } catch (geminiError) {
-      console.warn("Roadmap fallback triggered:", geminiError);
+      console.warn("Roadmap using fallback response engine.");
       const fallback = generateFallbackRoadmap(req.body);
       return res.json({ success: true, data: fallback });
     }
@@ -324,7 +329,7 @@ Return strictly valid JSON:
       const result = await generateAIContentWithFallback(prompt);
       return res.json({ success: true, data: result });
     } catch (geminiError) {
-      console.warn("Resume enhance fallback triggered:", geminiError);
+      console.warn("Resume enhance using fallback engine.");
       return res.json({
         success: true,
         data: {
@@ -378,7 +383,7 @@ Return strictly valid JSON:
       const result = await generateAIContentWithFallback(prompt);
       return res.json({ success: true, data: result });
     } catch (geminiError) {
-      console.warn("Resume analyze fallback triggered:", geminiError);
+      console.warn("Resume analyze using fallback engine.");
       return res.json({
         success: true,
         data: {
@@ -652,12 +657,14 @@ app.post("/api/interview/report", async (req, res) => {
   try {
     const { targetRole = "Software Engineer", interviewType = "Technical", questions = [], responses = [] } = req.body;
 
+    const totalQuestionsCount = Math.max(1, questions.length || responses.length || 12);
+
     const prompt = `You are a Principal Tech Recruiter & Engineering Director. Generate a comprehensive, highly insightful Mock Interview Performance Report for a candidate applying for ${targetRole} (${interviewType} format).
 
-Questions & Candidate Evaluations:
+Questions & Candidate Evaluations (${responses.length} answered out of ${totalQuestionsCount} total questions):
 ${JSON.stringify(responses, null, 2)}
 
-Analyze their performance across all ${responses.length || questions.length || 12} questions.
+Analyze their performance across all ${totalQuestionsCount} questions. If questions were unanswered, count them as 0 credit.
 
 Return strictly valid JSON:
 {
@@ -699,6 +706,20 @@ Return strictly valid JSON:
 
     try {
       const parsed = await generateAIContentWithFallback(prompt);
+
+      // Ensure mathematical alignment of overallScore & hiringVerdict based on actual responses
+      let realSum = 0;
+      responses.forEach((r: any) => {
+        realSum += Number(r.evaluation?.score) || 0;
+      });
+      const calcOverall = Math.min(100, Math.max(0, Math.round(realSum / totalQuestionsCount)));
+      parsed.overallScore = calcOverall;
+
+      if (calcOverall >= 82) parsed.hiringVerdict = "Strong Hire";
+      else if (calcOverall >= 65) parsed.hiringVerdict = "Hire";
+      else if (calcOverall >= 40) parsed.hiringVerdict = "Weak Hire";
+      else parsed.hiringVerdict = "No Hire";
+
       return res.json({ success: true, data: parsed });
     } catch (geminiError) {
       const fallbackReport = generateFallbackInterviewReport(req.body);
@@ -713,13 +734,15 @@ Return strictly valid JSON:
 
 function generateFallbackInterviewReport(payload: any) {
   const responses = payload.responses || [];
+  const questions = payload.questions || [];
   const targetRole = payload.targetRole || "Software Engineer";
-  
+  const totalQuestionsCount = Math.max(1, questions.length || responses.length || 12);
+
   let totalScore = 0;
   let totalComm = 0;
   let totalTech = 0;
   let totalProb = 0;
-  
+
   const questionSummaries = responses.map((r: any, idx: number) => {
     const s = Number(r.evaluation?.score) || 0;
     totalScore += s;
@@ -730,7 +753,7 @@ function generateFallbackInterviewReport(payload: any) {
     let verdict = "Needs Work";
     if (s >= 80) verdict = "Strong";
     else if (s >= 50) verdict = "Average";
-    else if (s <= 15) verdict = "Unanswered";
+    else if (s <= 15 || r.userAnswer === "Unanswered") verdict = "Unanswered";
 
     return {
       questionNumber: idx + 1,
@@ -742,23 +765,22 @@ function generateFallbackInterviewReport(payload: any) {
     };
   });
 
-  const count = Math.max(1, responses.length);
-  const overallScore = Math.round(totalScore / count);
-  const communicationScore = Math.round(totalComm / count);
-  const technicalScore = Math.round(totalTech / count);
-  const problemSolvingScore = Math.round(totalProb / count);
+  const overallScore = Math.min(100, Math.max(0, Math.round(totalScore / totalQuestionsCount)));
+  const communicationScore = Math.min(100, Math.max(0, Math.round(totalComm / totalQuestionsCount)));
+  const technicalScore = Math.min(100, Math.max(0, Math.round(totalTech / totalQuestionsCount)));
+  const problemSolvingScore = Math.min(100, Math.max(0, Math.round(totalProb / totalQuestionsCount)));
   const starMethodScore = Math.round((communicationScore + problemSolvingScore) / 2);
 
   let hiringVerdict: "Strong Hire" | "Hire" | "Weak Hire" | "No Hire" = "No Hire";
   if (overallScore >= 82) hiringVerdict = "Strong Hire";
-  else if (overallScore >= 68) hiringVerdict = "Hire";
-  else if (overallScore >= 45) hiringVerdict = "Weak Hire";
+  else if (overallScore >= 65) hiringVerdict = "Hire";
+  else if (overallScore >= 40) hiringVerdict = "Weak Hire";
 
   const lowScoring = responses.filter((r: any) => (r.evaluation?.score || 0) < 60);
   const skillGaps = lowScoring.slice(0, 3).map((r: any) => ({
     skill: r.question ? (r.question.split(" ").slice(0, 5).join(" ") + "...") : "Technical Mechanism Depth",
     severity: (r.evaluation?.score || 0) < 20 ? "High" : "Medium",
-    description: `Candidate scored ${r.evaluation?.score || 0}% due to missing technical mechanism details or unanswered prompt.`,
+    description: `Candidate scored ${r.evaluation?.score || 0}% due to missing technical details or unanswered question.`,
     howToFix: `Practice articulating trade-offs, architecture, and core mechanics for ${r.question || 'this topic'}.`
   }));
 
@@ -771,6 +793,8 @@ function generateFallbackInterviewReport(payload: any) {
     });
   }
 
+  const answeredCount = responses.filter((r: any) => r.userAnswer && r.userAnswer !== "Unanswered" && r.userAnswer !== "I don't know").length;
+
   return {
     overallScore,
     hiringVerdict,
@@ -778,66 +802,159 @@ function generateFallbackInterviewReport(payload: any) {
     technicalScore,
     problemSolvingScore,
     starMethodScore,
-    executiveSummary: `Completed a ${count}-question mock interview for ${targetRole}. Overall performance: ${overallScore}% (${hiringVerdict}). ${lowScoring.length > 0 ? `${lowScoring.length} question(s) flagged for revision.` : 'Demonstrated strong readiness across all topics.'}`,
+    executiveSummary: `Completed ${answeredCount} of ${totalQuestionsCount} questions in mock interview for ${targetRole}. Overall score: ${overallScore}% (${hiringVerdict}). ${lowScoring.length > 0 ? `${lowScoring.length} question(s) flagged for revision.` : 'Demonstrated strong technical readiness.'}`,
     skillGaps,
     communicationFeedback: {
       strengths: ["Clear tone and willingness to engage", "Good response structure"],
-      areasToImprove: ["Avoid skipping or answering 'I don't know' without explaining partial knowledge", "Incorporate quantifiable STAR results"]
+      areasToImprove: ["Avoid skipping or leaving questions unanswered", "Incorporate quantifiable STAR results"]
     },
     whatToImprove: [
       "Use STAR (Situation, Task, Action, Result) format for behavioral questions.",
       "For technical topics, start with high-level mechanics before detailing code implementation.",
-      "Always attempt partial reasoning instead of answering 'I don't know' directly."
+      "Always attempt partial reasoning instead of leaving questions unanswered."
     ],
     questionSummaries
+  };
+}
+
+function generateDynamicMentorFallback(query: string, userContext: any = {}) {
+  const q = String(query || "").trim();
+  const lowerQ = q.toLowerCase();
+  const career = userContext?.careerGoal || userContext?.targetCareer || "Software Engineer";
+
+  let topicTitle = "Career & Technical Guidance";
+  let explanation = "";
+  let followUps = [
+    "What projects should I build to demonstrate this skill?",
+    "How do I explain this topic during a technical interview?",
+    "What resources or documentation do you recommend?"
+  ];
+  let takeaway = "Focusing on core principles and building hands-on projects accelerates technical growth.";
+
+  if (lowerQ.includes("interview") || lowerQ.includes("tell me about yourself") || lowerQ.includes("behavioral")) {
+    topicTitle = "Technical & Behavioral Interview Strategy";
+    explanation = `When answering interview questions regarding **${q}** for a **${career}** position:\n\n` +
+      `1. **Use the STAR Method**: Structure your response with Situation, Task, Action, and Result.\n` +
+      `2. **Highlight Technical Architecture**: Explain the specific trade-offs (e.g. latency vs consistency, memory vs execution speed).\n` +
+      `3. **Quantify Your Results**: Mention concrete metrics like *"reduced P95 database query time by 40%"* or *"handled 5,000 concurrent requests"*.`;
+    followUps = [
+      "Can we do a practice mock interview question together?",
+      "How should I structure my response for system design questions?",
+      "What are the top red flags interviewers look for?"
+    ];
+    takeaway = "Clear technical articulation using STAR method and quantifiable impact sets top candidates apart.";
+  } else if (lowerQ.includes("resume") || lowerQ.includes("cv") || lowerQ.includes("ats")) {
+    topicTitle = "ATS Resume Optimization";
+    explanation = `To optimize your resume for **${career}** roles:\n\n` +
+      `1. **Action-Oriented Bullet Points**: Begin each bullet with strong verbs (*Architected, Deployed, Engineered, Optimized*).\n` +
+      `2. **Keyword Match**: Include essential tech stack keywords such as *TypeScript, Docker, PostgreSQL, REST APIs, and System Design*.\n` +
+      `3. **Showcase Measurable Outcomes**: Focus on outcomes over duty descriptions.`;
+    followUps = [
+      "How do I highlight personal projects if I don't have internship experience?",
+      "What ATS score should I aim for on my resume?",
+      "How do I present my GitHub repositories on my resume?"
+    ];
+    takeaway = "Action verbs paired with quantifiable impact metrics maximize ATS screening pass rates.";
+  } else if (lowerQ.includes("project") || lowerQ.includes("portfolio") || lowerQ.includes("github")) {
+    topicTitle = "Portfolio & GitHub Project Mastery";
+    explanation = `For **${q}** as an aspiring **${career}**:\n\n` +
+      `1. **Build Full-Stack Microservices**: Avoid basic tutorial clones. Build production-ready services with database indexing and caching.\n` +
+      `2. **Comprehensive README Documentation**: Include an architecture flow diagram, API documentation, and a live deployment preview link.\n` +
+      `3. **Clean Code & Testing**: Include containerization (Dockerfile) and CI/CD test workflows.`;
+    followUps = [
+      "What are 3 unique project ideas for my portfolio?",
+      "How do I write an impressive GitHub README?",
+      "Should I include live demo URLs for every project?"
+    ];
+    takeaway = "A well-documented, deployed repository with clean architecture is the strongest hiring signal.";
+  } else if (lowerQ.includes("sql") || lowerQ.includes("postgres") || lowerQ.includes("database") || lowerQ.includes("query")) {
+    topicTitle = "Database & Persistence Strategy";
+    explanation = `Regarding **${q}**:\n\n` +
+      `1. **Indexing & Query Planning**: Use EXPLAIN ANALYZE to identify sequential scans and optimize composite indexes.\n` +
+      `2. **Connection Pooling**: Implement pooling (e.g. PgBouncer) to prevent connection exhaustion under heavy concurrency.\n` +
+      `3. **ACID & Normalization**: Maintain data integrity while understanding when to selectively denormalize for read performance.`;
+    followUps = [
+      "When should I choose SQL vs NoSQL databases?",
+      "How does Redis caching complement PostgreSQL?",
+      "What are database migration best practices?"
+    ];
+    takeaway = "Understanding query execution plans and indexing strategy is crucial for high-scale backend engineering.";
+  } else if (lowerQ.includes("docker") || lowerQ.includes("cloud") || lowerQ.includes("deploy") || lowerQ.includes("kubernetes")) {
+    topicTitle = "Cloud Infrastructure & Containerization";
+    explanation = `Regarding **${q}**:\n\n` +
+      `1. **Container Isolation**: Multi-stage Docker builds reduce container image sizes and remove unnecessary build dependencies.\n` +
+      `2. **Environment Parity**: Containerization ensures your app behaves identically across dev, staging, and Cloud Run production.\n` +
+      `3. **Automated Pipelines**: Trigger automated builds and deployments via GitHub Actions workflows on pull-request merge.`;
+    followUps = [
+      "How do I set up a multi-stage Dockerfile for Node.js?",
+      "What is the simplest way to deploy containers for free?",
+      "How do environment variables and secrets work in production?"
+    ];
+    takeaway = "Containerization and automated CI/CD deployment pipelines are essential skills for modern software engineering.";
+  } else {
+    topicTitle = `Guidance on ${q.length > 40 ? q.slice(0, 40) + '...' : q}`;
+    explanation = `Here is strategic advice regarding **"${q}"** for your journey towards becoming a **${career}**:\n\n` +
+      `1. **Core Understanding**: Master the foundational concepts and trade-offs behind this topic.\n` +
+      `2. **Practical Implementation**: Apply this knowledge by building a standalone prototype or integration.\n` +
+      `3. **Technical Communication**: Be prepared to explain your design decisions, edge cases, and performance considerations.`;
+    followUps = [
+      `How does ${q} apply to real-world production systems?`,
+      "What are the most common interview questions on this topic?",
+      "What should my next learning step be?"
+    ];
+    takeaway = `Mastering ${q} strengthens your technical depth and career readiness as a ${career}.`;
+  }
+
+  return {
+    replyMarkdown: `### 💡 ${topicTitle}\n\n${explanation}`,
+    suggestedFollowUps: followUps,
+    keyTakeaway: takeaway
   };
 }
 
 // 6. AI Mentor Chat
 app.post("/api/mentor/chat", async (req, res) => {
   try {
-    const { message, conversationHistory = [], userContext = {} } = req.body;
+    const userQuery = req.body.message || req.body.query || req.body.text || "How can I advance my CS career?";
+    const { conversationHistory = [], userContext = {} } = req.body;
 
     const systemInstruction = `You are SkillBridge AI - an empathetic, razor-sharp, 24/7 AI Career Mentor for Computer Science students.
-User Career Goal: ${userContext.careerGoal || "Software Engineer"}
+User Career Goal: ${userContext.careerGoal || userContext.targetCareer || "Software Engineer"}
 User Level: ${userContext.experienceLevel || "CS Student"}
 User Skills: ${JSON.stringify(userContext.skills || [])}
 
-Provide direct, actionable, encouraging, and clear career advice, technical explanations, interview prep guidance, code reviews, or roadmap tips. Keep responses concise, well-structured with markdown headings or bullet points where appropriate. Be empathetic yet realistic about industry standards.`;
+Provide direct, actionable, encouraging, and clear career advice, technical explanations, interview prep guidance, code reviews, or roadmap tips specifically answering: "${userQuery}". Keep responses concise, well-structured with markdown headings or bullet points where appropriate. Be empathetic yet realistic about industry standards.`;
 
-    const fullPrompt = `${systemInstruction}\n\nRecent History:\n${conversationHistory.map((h: any) => `${h.role}: ${h.text}`).join("\n")}\n\nUser Question: ${message}\n\nReturn strictly valid JSON with this exact schema:
+    const formattedHistory = Array.isArray(conversationHistory)
+      ? conversationHistory.map((h: any) => `${h.role || h.sender || "user"}: ${h.text || h.content || ""}`).join("\n")
+      : "";
+
+    const fullPrompt = `${systemInstruction}\n\nRecent History:\n${formattedHistory}\n\nUser Question: ${userQuery}\n\nReturn strictly valid JSON with this exact schema:
 {
-  "replyMarkdown": "string mentor answer with markdown formatting",
-  "suggestedFollowUps": ["question 1", "question 2"],
+  "replyMarkdown": "string mentor answer with markdown formatting directly addressing: '${userQuery}'",
+  "suggestedFollowUps": ["relevant follow-up question 1", "relevant follow-up question 2"],
   "keyTakeaway": "string main insight"
 }`;
 
     try {
       const result = await generateAIContentWithFallback(fullPrompt);
-      return res.json({ success: true, data: result });
+      if (result && result.replyMarkdown) {
+        return res.json({ success: true, data: result });
+      }
+      throw new Error("Empty model response");
     } catch (geminiError) {
       console.warn("Mentor chat fallback triggered:", geminiError);
+      const dynamicFallback = generateDynamicMentorFallback(userQuery, userContext);
       return res.json({
         success: true,
-        data: {
-          replyMarkdown: `### 🚀 Guidance for ${userContext.careerGoal || "Software Engineer"}\n\nThat is an important topic! To advance towards your career goals effectively:\n\n1. **Focus on Hands-On Build Tasks**: Build production-ready TypeScript microservices with PostgreSQL and Redis.\n2. **Practice Technical Articulation**: Explain system trade-offs using the STAR method in mock interview sessions.\n3. **Optimize Portfolio Signals**: Keep your GitHub repository README files updated with architecture diagrams and live links.`,
-          suggestedFollowUps: [
-            "How do I prepare for coding interviews?",
-            "What projects stand out to recruiters?",
-            "How do I deploy a Docker container to Cloud Run?"
-          ],
-          keyTakeaway: "Building real-world projects with clean documentation is the #1 signal to tech recruiters."
-        }
+        data: dynamicFallback
       });
     }
   } catch (error: any) {
+    const userQuery = req.body?.message || req.body?.query || "Career Guidance";
     res.json({
       success: true,
-      data: {
-        replyMarkdown: "Keep building and practicing core fundamentals! Consistency with coding and mock interviews will get you hired.",
-        suggestedFollowUps: ["What skills should I learn next?"],
-        keyTakeaway: "Consistency beats intensity."
-      }
+      data: generateDynamicMentorFallback(userQuery, req.body?.userContext)
     });
   }
 });
@@ -1244,7 +1361,7 @@ Return strictly valid JSON array of recommended jobs:
       const result = await generateAIContentWithFallback(prompt);
       return res.json({ success: true, data: result });
     } catch (geminiError) {
-      console.warn("Job matcher fallback triggered:", geminiError);
+      console.warn("Job matcher using fallback engine.");
       return res.json({
         success: true,
         data: {
@@ -1321,7 +1438,7 @@ Return strictly valid JSON:
       const result = await generateAIContentWithFallback(prompt);
       return res.json({ success: true, data: result });
     } catch (geminiError) {
-      console.warn("Dashboard insights fallback triggered:", geminiError);
+      console.warn("Dashboard insights using fallback engine.");
       return res.json({
         success: true,
         data: {

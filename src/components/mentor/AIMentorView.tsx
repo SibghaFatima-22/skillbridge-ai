@@ -59,9 +59,12 @@ export const AIMentorView: React.FC = () => {
 
     const res = await sendMentorMessageAPI({
       query,
+      message: query,
       conversationHistory: history,
       userContext: {
+        careerGoal: "Software Engineer",
         targetCareer: "Backend Developer",
+        experienceLevel: "CS Student",
         careerReadiness: 78,
       },
     });
@@ -69,9 +72,12 @@ export const AIMentorView: React.FC = () => {
     const mentorMsg: ChatMessage = {
       id: "m_" + Date.now(),
       sender: "mentor",
-      text: res.replyMarkdown || "Focusing on building production projects with Docker and Redis is key.",
+      text: res?.replyMarkdown || `### 💡 Guidance for "${query}"\n\nFocusing on core engineering fundamentals, hands-on production project builds, and articulating your architectural choices clearly during interviews will help you succeed on this topic.`,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      suggestedFollowUps: res.suggestedFollowUps || [],
+      suggestedFollowUps: res?.suggestedFollowUps || [
+        "What projects should I build to demonstrate this?",
+        "How do I explain this topic in a technical interview?"
+      ],
     };
 
     setMessages((prev) => [...prev, mentorMsg]);

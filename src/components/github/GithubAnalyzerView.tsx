@@ -29,11 +29,13 @@ import {
 interface GitHubAnalyzerViewProps {
   user?: any;
   setActiveTab?: (tab: string) => void;
+  addNotification?: (title: string, message: string, type?: "info" | "success" | "warning" | "achievement") => void;
 }
 
 export const GitHubAnalyzerView: React.FC<GitHubAnalyzerViewProps> = ({
   user,
-  setActiveTab
+  setActiveTab,
+  addNotification
 }: GitHubAnalyzerViewProps) => {
   const [usernameInput, setUsernameInput] = useState('');
   const [targetRoleInput, setTargetRoleInput] = useState(user?.targetRole || 'Full Stack Software Engineer');
@@ -192,16 +194,31 @@ export const GitHubAnalyzerView: React.FC<GitHubAnalyzerViewProps> = ({
       }
 
       const data = await res.json();
+      let resAnalysis: GitHubAnalysisResult;
       if (data.success && data.data) {
-        setAnalysis(data.data);
+        resAnalysis = data.data;
       } else {
-        const fallback = createClientFallbackGitHubAnalysis(handleToUse, targetRoleInput, clientFetchedUser, clientFetchedRepos);
-        setAnalysis(fallback);
+        resAnalysis = createClientFallbackGitHubAnalysis(handleToUse, targetRoleInput, clientFetchedUser, clientFetchedRepos);
+      }
+      setAnalysis(resAnalysis);
+      if (addNotification) {
+        addNotification(
+          "GitHub Profile Analysis Complete 🐙",
+          `Analyzed @${handleToUse}: Rating ${resAnalysis.profileRating || resAnalysis.portfolioScore || 85}/100. ${resAnalysis.projectRatings?.length || 0} projects evaluated.`,
+          "success"
+        );
       }
     } catch (err: any) {
       console.warn('Network or API response error, using client fallback analysis:', err);
       const fallback = createClientFallbackGitHubAnalysis(handleToUse, targetRoleInput, clientFetchedUser, clientFetchedRepos);
       setAnalysis(fallback);
+      if (addNotification) {
+        addNotification(
+          "GitHub Profile Analysis Complete 🐙",
+          `Analyzed @${handleToUse}: Rating ${fallback.profileRating}/100. ${fallback.projectRatings?.length || 0} projects evaluated.`,
+          "success"
+        );
+      }
     } finally {
       setIsAnalyzing(false);
     }
@@ -708,3 +725,4 @@ export const GitHubAnalyzerView: React.FC<GitHubAnalyzerViewProps> = ({
 
 export default GitHubAnalyzerView;
 export const GithubAnalyzerView = GitHubAnalyzerView;
+

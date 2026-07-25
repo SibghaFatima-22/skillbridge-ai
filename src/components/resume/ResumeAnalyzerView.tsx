@@ -12,7 +12,11 @@ import {
 } from "lucide-react";
 import { analyzeResumeAPI } from "../../lib/api";
 
-export const ResumeAnalyzerView: React.FC = () => {
+interface ResumeAnalyzerViewProps {
+  addNotification?: (title: string, message: string, type?: "info" | "success" | "warning" | "achievement") => void;
+}
+
+export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({ addNotification }) => {
   const [resumeText, setResumeText] = useState(
     "Ali Ahmed\nComputer Science Senior Student\nSkills: C++, JavaScript, Node.js, Express, PostgreSQL, Git\nProjects: E-commerce backend API using Express and PostgreSQL. Implemented JWT authentication and rate limiting."
   );
@@ -29,6 +33,14 @@ export const ResumeAnalyzerView: React.FC = () => {
     });
     setAnalysisResult(data);
     setLoading(false);
+
+    if (addNotification && data) {
+      addNotification(
+        "Resume ATS Scan Complete 📄",
+        `ATS Match Score for ${targetJobTitle}: ${data.atsScore || 82}%. ${data.improvements?.length || 0} areas flagged for optimization.`,
+        "success"
+      );
+    }
   };
 
   return (

@@ -18,7 +18,9 @@ import { ProfileView } from "./components/profile/ProfileView";
 import { SettingsView } from "./components/settings/SettingsView";
 import { AdminDashboardView } from "./components/admin/AdminDashboardView";
 
+import { NotificationItem } from "./types";
 import {
+  storage,
   initialUserProfile,
   initialAssessmentData,
   initialRoadmapData,
@@ -44,8 +46,29 @@ export function App() {
   const [resources, setResources] = useState(initialResourceItems);
   const [resume, setResume] = useState(initialResumeData);
   const [jobs, setJobs] = useState(initialJobMatches);
-  const [notifications, setNotifications] = useState(initialNotifications);
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => storage.getNotifications());
   const [badges, setBadges] = useState(initialBadges);
+
+  const handleSetNotifications = (newNotifs: NotificationItem[]) => {
+    setNotifications(newNotifs);
+    storage.setNotifications(newNotifs);
+  };
+
+  const addNotification = (title: string, message: string, type: "info" | "success" | "warning" | "achievement" = "info") => {
+    const newNotif: NotificationItem = {
+      id: "notif_" + Date.now(),
+      title,
+      message,
+      type,
+      read: false,
+      createdAt: new Date().toISOString(),
+    };
+    setNotifications((prev) => {
+      const updated = [newNotif, ...prev];
+      storage.setNotifications(updated);
+      return updated;
+    });
+  };
 
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -113,7 +136,7 @@ export function App() {
           <Navbar
             user={user}
             notifications={notifications}
-            setNotifications={setNotifications}
+            setNotifications={handleSetNotifications}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             theme={theme}
@@ -146,6 +169,7 @@ export function App() {
                   syncAssessmentWithFirestore(user.id, newAsm);
                 }}
                 setActiveTab={setActiveTab}
+                addNotification={addNotification}
               />
             )}
 
@@ -174,15 +198,15 @@ export function App() {
               />
             )}
 
-            {activeTab === "resume-analyzer" && <ResumeAnalyzerView />}
+            {activeTab === "resume-analyzer" && <ResumeAnalyzerView addNotification={addNotification} />}
 
-            {activeTab === "interview" && <InterviewCoachView />}
+            {activeTab === "interview" && <InterviewCoachView addNotification={addNotification} />}
 
             {activeTab === "job-matcher" && (
               <JobMatcherView jobs={jobs} setJobs={setJobs} />
             )}
 
-            {activeTab === "github" && <GithubAnalyzerView user={user} setActiveTab={setActiveTab} />}
+            {activeTab === "github" && <GithubAnalyzerView user={user} setActiveTab={setActiveTab} addNotification={addNotification} />}
 
             {activeTab === "mentor" && <AIMentorView />}
 

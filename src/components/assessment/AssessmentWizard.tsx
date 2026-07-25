@@ -21,12 +21,14 @@ interface AssessmentWizardProps {
   assessment: AssessmentData;
   setAssessment: (asm: AssessmentData) => void;
   setActiveTab: (tab: string) => void;
+  addNotification?: (title: string, message: string, type?: "info" | "success" | "warning" | "achievement") => void;
 }
 
 export const AssessmentWizard: React.FC<AssessmentWizardProps> = ({
   assessment,
   setAssessment,
   setActiveTab,
+  addNotification,
 }) => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -104,6 +106,14 @@ export const AssessmentWizard: React.FC<AssessmentWizardProps> = ({
     setAssessment(updatedAssessment);
     setLoading(false);
     setStep(9); // Completion Screen
+
+    if (addNotification) {
+      addNotification(
+        "Career Assessment Completed 🎉",
+        `Assessment complete! Readiness updated to ${updatedAssessment.careerReadiness}%. View your customized learning roadmap.`,
+        "achievement"
+      );
+    }
   };
 
   return (

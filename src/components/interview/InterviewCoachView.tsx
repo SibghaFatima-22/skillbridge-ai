@@ -26,7 +26,11 @@ import {
 } from "lucide-react";
 import { generateInterviewAPI, evaluateInterviewAnswerAPI, generateInterviewReportAPI } from "../../lib/api";
 
-export const InterviewCoachView: React.FC = () => {
+interface InterviewCoachViewProps {
+  addNotification?: (title: string, message: string, type?: "info" | "success" | "warning" | "achievement") => void;
+}
+
+export const InterviewCoachView: React.FC<InterviewCoachViewProps> = ({ addNotification }) => {
   const [role, setRole] = useState("Backend Engineer");
   const [type, setType] = useState<"Technical" | "Behavioral" | "System Design" | "Comprehensive Full Mock">("Comprehensive Full Mock");
   const [questionCountChoice, setQuestionCountChoice] = useState<number>(12);
@@ -370,6 +374,32 @@ export const InterviewCoachView: React.FC = () => {
       });
     }
 
+    // Fill in any unanswered questions so every question in questions is accounted for
+    questions.forEach((q, idx) => {
+      const qIdx = idx + 1;
+      if (!responsesToUse.some((r) => r.questionIndex === qIdx)) {
+        responsesToUse.push({
+          questionIndex: qIdx,
+          question: q.question || `Question ${qIdx}`,
+          userAnswer: "Unanswered",
+          evaluation: {
+            score: 0,
+            communicationScore: 0,
+            technicalAccuracyScore: 0,
+            problemSolvingScore: 0,
+            confidenceScore: 0,
+            feedback: "Question unanswered when session finished early.",
+            missingKeyPoints: ["Response required"],
+            modelAnswer: q.hint || "Review technical mechanics and STAR principles for this question.",
+            hiringRecommendation: "No Hire"
+          }
+        });
+      }
+    });
+
+    // Sort responses by questionIndex
+    responsesToUse.sort((a, b) => a.questionIndex - b.questionIndex);
+
     try {
       const report = await generateInterviewReportAPI({
         targetRole: role,
@@ -379,6 +409,17 @@ export const InterviewCoachView: React.FC = () => {
       });
 
       setReportData(report);
+
+      if (addNotification) {
+        const answeredCount = responsesToUse.filter(
+          (r) => r.userAnswer && r.userAnswer !== "Unanswered" && !r.userAnswer.toLowerCase().includes("don't know")
+        ).length;
+        addNotification(
+          "Mock Interview Evaluation Ready 🎯",
+          `${role} mock interview complete (${answeredCount}/${questions.length} answered). Score: ${report.overallScore}% (${report.hiringVerdict}).`,
+          report.overallScore >= 65 ? "success" : "info"
+        );
+      }
     } catch (err) {
       console.error("Error generating interview report:", err);
     } finally {
@@ -812,7 +853,7 @@ Takeaway: ${q.keyTakeaway}
                       </div>
                       <h2 className="text-2xl md:text-3xl font-extrabold">{role} Mock Interview</h2>
                       <p className="text-xs text-slate-400 mt-1">
-                        {questions.length} Questions Answered • Total Time: {formatTimer(secondsElapsed)}
+                        {completedResponses.filter(r => r.userAnswer && r.userAnswer !== "Unanswered" && !r.userAnswer.toLowerCase().includes("don't know")).length} of {questions.length} Questions Answered • Total Time: {formatTimer(secondsElapsed)}
                       </p>
                     </div>
 
