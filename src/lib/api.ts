@@ -261,15 +261,25 @@ export async function sendMentorMessageAPI(payload: any) {
     if (!res.ok || !data.success || !data.data) throw new Error(data.error || "Failed to get mentor response");
     return data.data;
   } catch (err: any) {
-    const shortTopic = queryText.length > 40 ? queryText.slice(0, 40) + "..." : queryText;
+    let cleanTopic = queryText.trim()
+      .replace(/["'“”]/g, "")
+      .replace(/^(how do i|what are|what is|how to|tell me about|can you|explain|what projects|how can i|what should i|why is|why do)/gi, "")
+      .replace(/(in a technical interview|for a software engineer|for a backend engineer|in an interview|for cs students|to avoid|pitfalls|mistakes|for scale|in production|with|about)\??$/gi, "")
+      .trim();
+
+    const topicWords = cleanTopic.split(/\s+/).filter((w: string) => w.length > 2 && !["how", "what", "can", "you", "tell", "about", "the", "for", "with", "and", "does", "explain", "give", "help", "need", "should"].includes(w.toLowerCase()));
+    const topicSubject = topicWords.length > 0
+      ? topicWords.slice(0, 4).map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ")
+      : "Backend Engineering";
+
     return {
-      replyMarkdown: `### 💡 Career & Technical Guidance on "${shortTopic}"\n\nRegarding **"${queryText}"**:\n\n1. **Core Architectural Mechanics**: Master the fundamental principles, runtime execution, and system trade-offs behind **"${shortTopic}"**.\n2. **Hands-On Implementation**: Build a standalone project module or integration using **"${shortTopic}"** to validate your practical skills.\n3. **Interview Communication**: Be prepared to explain your design decisions, latency/memory trade-offs, and edge-case handling clearly using the STAR method.`,
+      replyMarkdown: `### 💡 Career & Technical Guidance on ${topicSubject}\n\n1. **Core Architectural Mechanics**: Master the fundamental principles, runtime execution, and system trade-offs behind **${topicSubject}**.\n2. **Hands-On Implementation**: Build a standalone project module or portfolio integration focusing on **${topicSubject}** to validate your practical skills.\n3. **Interview Communication**: Be prepared to explain your design decisions, latency/memory trade-offs, and edge-case handling clearly using the STAR method.`,
       suggestedFollowUps: [
-        `How do I explain "${shortTopic}" in a technical interview?`,
-        `What projects can I build to demonstrate "${shortTopic}"?`,
-        `What are common pitfalls or mistakes to avoid with "${shortTopic}"?`
+        `How do I explain ${topicSubject} in a technical interview?`,
+        `What projects can I build to demonstrate ${topicSubject}?`,
+        `What are common pitfalls or mistakes to avoid with ${topicSubject}?`
       ],
-      keyTakeaway: `Mastering ${shortTopic} demonstrates technical depth and engineering maturity.`,
+      keyTakeaway: `Mastering ${topicSubject} demonstrates technical depth and engineering maturity.`
     };
   }
 }
@@ -387,3 +397,5 @@ export async function getDashboardInsightsAPI(userStats: any) {
     };
   }
 }
+
+
