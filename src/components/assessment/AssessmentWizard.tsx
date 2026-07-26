@@ -14,12 +14,14 @@ import {
   Loader2,
   Award,
 } from "lucide-react";
-import { AssessmentData, TargetCareerRole, SkillRating } from "../../types";
-import { analyzeAssessmentAPI } from "../../lib/api";
+import { AssessmentData, TargetCareerRole, SkillRating, RoadmapData } from "../../types";
+import { analyzeAssessmentAPI, generateRoadmapAPI } from "../../lib/api";
 
 interface AssessmentWizardProps {
   assessment: AssessmentData;
   setAssessment: (asm: AssessmentData) => void;
+  roadmap?: RoadmapData;
+  setRoadmap?: (rdm: RoadmapData) => void;
   setActiveTab: (tab: string) => void;
   addNotification?: (title: string, message: string, type?: "info" | "success" | "warning" | "achievement") => void;
 }
@@ -27,6 +29,8 @@ interface AssessmentWizardProps {
 export const AssessmentWizard: React.FC<AssessmentWizardProps> = ({
   assessment,
   setAssessment,
+  roadmap,
+  setRoadmap,
   setActiveTab,
   addNotification,
 }) => {
@@ -59,12 +63,23 @@ export const AssessmentWizard: React.FC<AssessmentWizardProps> = ({
     "UI/UX Designer",
   ];
 
-  const updateRating = (list: SkillRating[], setList: (l: SkillRating[]) => void, name: string, rating: number) => {
-    setList(list.map((item) => (item.name === name ? { ...item, rating } : item)));
+  // FIX: previously took `list` as a captured closure snapshot and called
+  // setList(list.map(...)) directly. Under batched updates, two rating
+  // clicks in quick succession could both read the same stale `list`,
+  // so the second click's update would silently overwrite the first.
+  // Using the functional updater form guarantees every update starts from
+  // the true latest state.
+  const updateRating = (
+    setList: React.Dispatch<React.SetStateAction<SkillRating[]>>,
+    name: string,
+    rating: number
+  ) => {
+    setList((prev) => prev.map((item) => (item.name === name ? { ...item, rating } : item)));
   };
 
   const handleFinish = async () => {
     setLoading(true);
+
     const payload = {
       personalInfo,
       programmingSkills,
@@ -104,6 +119,66 @@ export const AssessmentWizard: React.FC<AssessmentWizardProps> = ({
     };
 
     setAssessment(updatedAssessment);
+
+    // FIX: the roadmap was never actually generated from the user's real
+    // assessment data. Previously this component only scored the
+    // assessment and flipped to the completion screen; whatever roadmap
+    // the app initialized with (a static default) is what every user saw
+    // until they manually hit "Regenerate," which itself used hardcoded
+    // skill arrays. Now we derive real current/missing skills from the
+    // actual ratings and generate a genuinely personalized roadmap here.
+    if (setRoadmap) {
+      const allRatedSkills = [
+        ...programmingSkills,
+        ...frameworks,
+        ...databases,
+        ...tools,
+      ];
+      const currentSkills = allRatedSkills
+        .filter((s) => s.rating >= 3)
+        .map((s) => s.name);
+      const weakSkillNames = allRatedSkills
+        .filter((s) => s.rating <= 2)
+        .map((s) => s.name);
+      const missingSkills = (updatedAssessment.missingSkills.length > 0
+        ? updatedAssessment.missingSkills
+        : weakSkillNames
+      );
+
+      const roadmapResult = await generateRoadmapAPI({
+        targetCareer,
+        currentSkills,
+        missingSkills,
+        dailyHours,
+        durationMonths: 3,
+      });
+
+      if (roadmapResult) {
+        setRoadmap({
+          id: "rdm_" + Date.now(),
+          userId: assessment.userId,
+          career: roadmapResult.career || targetCareer,
+          estimatedMonths: roadmapResult.estimatedMonths || 3,
+          estimatedWeeks: roadmapResult.estimatedWeeks || 12,
+          difficulty: roadmapResult.difficulty || "Intermediate",
+          summary: roadmapResult.summary || `Personalized roadmap for ${targetCareer}.`,
+          progress: 0,
+          capstoneProject: roadmapResult.capstoneProject || roadmap?.capstoneProject,
+          milestones: (roadmapResult.milestones || []).map((m: any, idx: number) => ({
+            ...m,
+            id: `m_${idx + 1}`,
+            completed: false,
+            weeklyTasks: (m.weeklyTasks || []).map((t: any, tidx: number) => ({
+              ...t,
+              id: `t_${idx + 1}_${tidx + 1}`,
+              completed: false,
+            })),
+          })),
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+
     setLoading(false);
     setStep(9); // Completion Screen
 
@@ -228,7 +303,7 @@ export const AssessmentWizard: React.FC<AssessmentWizardProps> = ({
                       <button
                         key={star}
                         type="button"
-                        onClick={() => updateRating(programmingSkills, setProgrammingSkills, skill.name, star)}
+                        onClick={() => updateRating(setProgrammingSkills, skill.name, star)}
                         className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
                           star <= skill.rating
                             ? "bg-blue-600 text-white shadow-sm"
@@ -267,7 +342,7 @@ export const AssessmentWizard: React.FC<AssessmentWizardProps> = ({
                       <button
                         key={star}
                         type="button"
-                        onClick={() => updateRating(frameworks, setFrameworks, skill.name, star)}
+                        onClick={() => updateRating(setFrameworks, skill.name, star)}
                         className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
                           star <= skill.rating
                             ? "bg-emerald-600 text-white shadow-sm"
@@ -306,7 +381,7 @@ export const AssessmentWizard: React.FC<AssessmentWizardProps> = ({
                       <button
                         key={star}
                         type="button"
-                        onClick={() => updateRating(databases, setDatabases, skill.name, star)}
+                        onClick={() => updateRating(setDatabases, skill.name, star)}
                         className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
                           star <= skill.rating
                             ? "bg-purple-600 text-white shadow-sm"
@@ -345,7 +420,7 @@ export const AssessmentWizard: React.FC<AssessmentWizardProps> = ({
                       <button
                         key={star}
                         type="button"
-                        onClick={() => updateRating(tools, setTools, skill.name, star)}
+                        onClick={() => updateRating(setTools, skill.name, star)}
                         className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
                           star <= skill.rating
                             ? "bg-amber-600 text-white shadow-sm"
@@ -384,7 +459,7 @@ export const AssessmentWizard: React.FC<AssessmentWizardProps> = ({
                       <button
                         key={star}
                         type="button"
-                        onClick={() => updateRating(softSkills, setSoftSkills, skill.name, star)}
+                        onClick={() => updateRating(setSoftSkills, skill.name, star)}
                         className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
                           star <= skill.rating
                             ? "bg-sky-600 text-white shadow-sm"

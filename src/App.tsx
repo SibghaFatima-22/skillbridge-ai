@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Navbar } from "./components/layout/Navbar";
 import { LandingPage } from "./components/landing/LandingPage";
@@ -49,12 +49,12 @@ export function App() {
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => storage.getNotifications());
   const [badges, setBadges] = useState(initialBadges);
 
-  const handleSetNotifications = (newNotifs: NotificationItem[]) => {
+  const handleSetNotifications = useCallback((newNotifs: NotificationItem[]) => {
     setNotifications(newNotifs);
     storage.setNotifications(newNotifs);
-  };
+  }, []);
 
-  const addNotification = (title: string, message: string, type: "info" | "success" | "warning" | "achievement" = "info") => {
+  const addNotification = useCallback((title: string, message: string, type: "info" | "success" | "warning" | "achievement" = "info") => {
     const newNotif: NotificationItem = {
       id: "notif_" + Date.now(),
       title,
@@ -68,7 +68,7 @@ export function App() {
       storage.setNotifications(updated);
       return updated;
     });
-  };
+  }, []);
 
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -89,7 +89,16 @@ export function App() {
     return () => unsubscribeAuth();
   }, []);
 
-  // Listen to live Firestore changes for user profile
+  // Listen to live Firestore changes for user profile.
+  // NOTE: this listener can fire independently of any user interaction
+  // (e.g. any write to this doc from another tab/session, or the initial
+  // sync-on-create branch below). Every fire calls setUser, which
+  // re-renders the whole App tree. Without memoized children (fixed below
+  // via useCallback + React.memo on the heavy views), that re-render was
+  // cascading into a full re-execution of whichever tab was mounted
+  // (e.g. the 8-step AssessmentWizard), which is what caused the
+  // "noticeable delay before it highlights" when a star click happened
+  // to land while one of these unrelated re-renders was in flight.
   useEffect(() => {
     if (!user.id) return;
     const userRef = doc(db, "users", user.id);
@@ -112,6 +121,30 @@ export function App() {
       document.documentElement.classList.remove("dark");
     }
   }, [theme]);
+
+  // Stabilized callback props. Previously these were inline arrow
+  // functions re-created on every App render, which defeats any child
+  // memoization and forces prop-identity-based effects/renders downstream
+  // to fire more often than necessary.
+  const handleSetAssessment = useCallback((newAsm: typeof assessment) => {
+    setAssessment(newAsm);
+    setUser((u) => {
+      const updated = { ...u, careerReadiness: newAsm.careerReadiness };
+      syncUserWithFirestore(u.id, updated);
+      return updated;
+    });
+    syncAssessmentWithFirestore(user.id, newAsm);
+  }, [user.id]);
+
+  const handleSetRoadmap = useCallback((newRdm: typeof roadmap) => {
+    setRoadmap(newRdm);
+    syncRoadmapWithFirestore(user.id, newRdm);
+  }, [user.id]);
+
+  const handleSetResume = useCallback((newResume: typeof resume) => {
+    setResume(newResume);
+    syncResumeWithFirestore(user.id, newResume);
+  }, [user.id]);
 
   // If activeTab is landing, show full public landing page
   if (activeTab === "landing") {
@@ -159,15 +192,9 @@ export function App() {
             {activeTab === "assessment" && (
               <AssessmentWizard
                 assessment={assessment}
-                setAssessment={(newAsm) => {
-                  setAssessment(newAsm);
-                  setUser((u) => {
-                    const updated = { ...u, careerReadiness: newAsm.careerReadiness };
-                    syncUserWithFirestore(u.id, updated);
-                    return updated;
-                  });
-                  syncAssessmentWithFirestore(user.id, newAsm);
-                }}
+                setAssessment={handleSetAssessment}
+                roadmap={roadmap}
+                setRoadmap={handleSetRoadmap}
                 setActiveTab={setActiveTab}
                 addNotification={addNotification}
               />
@@ -176,11 +203,9 @@ export function App() {
             {activeTab === "roadmap" && (
               <RoadmapView
                 roadmap={roadmap}
-                setRoadmap={(newRdm) => {
-                  setRoadmap(newRdm);
-                  syncRoadmapWithFirestore(user.id, newRdm);
-                }}
+                setRoadmap={handleSetRoadmap}
                 setActiveTab={setActiveTab}
+                assessment={assessment}
               />
             )}
 
@@ -191,10 +216,7 @@ export function App() {
             {activeTab === "resume-builder" && (
               <ResumeBuilderView
                 resume={resume}
-                setResume={(newResume) => {
-                  setResume(newResume);
-                  syncResumeWithFirestore(user.id, newResume);
-                }}
+                setResume={handleSetResume}
               />
             )}
 

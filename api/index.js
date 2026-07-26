@@ -326,8 +326,72 @@ Return strictly valid JSON with this exact schema:
     "deliverables": ["deliverable1", "deliverable2"]
   }
 }`;
+    const roadmapSchema = {
+      type: "object",
+      properties: {
+        career: { type: "string" },
+        estimatedMonths: { type: "number" },
+        estimatedWeeks: { type: "number" },
+        difficulty: { type: "string" },
+        summary: { type: "string" },
+        milestones: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              title: { type: "string" },
+              description: { type: "string" },
+              month: { type: "number" },
+              week: { type: "number" },
+              difficulty: { type: "string" },
+              estimatedHours: { type: "number" },
+              keyTopics: { type: "array", items: { type: "string" } },
+              weeklyTasks: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    title: { type: "string" },
+                    description: { type: "string" },
+                    type: { type: "string" },
+                    estimatedMinutes: { type: "number" },
+                    resourceUrl: { type: "string" }
+                  },
+                  required: ["id", "title", "description", "type", "estimatedMinutes"]
+                }
+              },
+              miniProject: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  techStack: { type: "array", items: { type: "string" } }
+                },
+                required: ["title", "description", "techStack"]
+              }
+            },
+            required: ["id", "title", "description", "month", "week", "difficulty", "estimatedHours", "keyTopics", "weeklyTasks"]
+          }
+        },
+        capstoneProject: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            description: { type: "string" },
+            deliverables: { type: "array", items: { type: "string" } }
+          },
+          required: ["title", "description", "deliverables"]
+        }
+      },
+      required: ["career", "estimatedMonths", "estimatedWeeks", "difficulty", "summary", "milestones", "capstoneProject"]
+    };
     try {
-      const result = await generateAIContentWithFallback(prompt, { type: "object" });
+      const result = await generateAIContentWithFallback(prompt, roadmapSchema);
+      if (!result || !Array.isArray(result.milestones) || result.milestones.length === 0) {
+        throw new Error("Roadmap response missing milestones");
+      }
       return res.json({ success: true, data: result });
     } catch (geminiError) {
       console.warn("Roadmap using fallback response engine.");

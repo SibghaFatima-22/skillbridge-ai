@@ -15,19 +15,25 @@ import {
   Loader2,
   Check,
 } from "lucide-react";
-import { RoadmapData, RoadmapTask } from "../../types";
+import { RoadmapData, RoadmapTask, AssessmentData } from "../../types";
 import { generateRoadmapAPI } from "../../lib/api";
 
 interface RoadmapViewProps {
   roadmap: RoadmapData;
   setRoadmap: (rdm: RoadmapData) => void;
   setActiveTab: (tab: string) => void;
+  // FIX: previously handleRegenerate always sent the exact same hardcoded
+  // currentSkills/missingSkills arrays regardless of who the user was,
+  // which is why every regenerated roadmap looked identical. Passing the
+  // real assessment through lets regeneration reflect actual skill data.
+  assessment?: AssessmentData;
 }
 
 export const RoadmapView: React.FC<RoadmapViewProps> = ({
   roadmap,
   setRoadmap,
   setActiveTab,
+  assessment,
 }) => {
   const [openMilestone, setOpenMilestone] = useState<string>(roadmap.milestones[0]?.id || "");
   const [regenerating, setRegenerating] = useState(false);
@@ -61,11 +67,37 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({
 
   const handleRegenerate = async () => {
     setRegenerating(true);
+
+    // FIX: derive real current/missing skills from the actual assessment
+    // (if available) instead of always sending the same hardcoded arrays.
+    // Falls back to the previous generic defaults only if no assessment
+    // data has been recorded yet for this user.
+    let currentSkills = ["TypeScript", "Node.js", "PostgreSQL"];
+    let missingSkills = ["Docker", "Redis", "Kafka", "System Design"];
+
+    if (assessment) {
+      const allRatedSkills = [
+        ...(assessment.programmingSkills || []),
+        ...(assessment.frameworks || []),
+        ...(assessment.databases || []),
+        ...(assessment.tools || []),
+      ];
+      const derivedCurrent = allRatedSkills.filter((s) => s.rating >= 3).map((s) => s.name);
+      const derivedWeak = allRatedSkills.filter((s) => s.rating <= 2).map((s) => s.name);
+
+      if (derivedCurrent.length > 0) currentSkills = derivedCurrent;
+      if (assessment.missingSkills && assessment.missingSkills.length > 0) {
+        missingSkills = assessment.missingSkills;
+      } else if (derivedWeak.length > 0) {
+        missingSkills = derivedWeak;
+      }
+    }
+
     const newRoadmapData = await generateRoadmapAPI({
       targetCareer: roadmap.career,
-      currentSkills: ["TypeScript", "Node.js", "PostgreSQL"],
-      missingSkills: ["Docker", "Redis", "Kafka", "System Design"],
-      dailyHours: 3,
+      currentSkills,
+      missingSkills,
+      dailyHours: assessment?.dailyHours || 3,
       durationMonths: 3,
     });
 
