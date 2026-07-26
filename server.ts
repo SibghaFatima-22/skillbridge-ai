@@ -31,7 +31,7 @@ function getGeminiClient() {
 }
 
 // System model for text/JSON generation
-const AI_MODEL = "gemini-2.5-flash";
+const AI_MODEL = "gemini-flash-latest";
 
 function extractAndParseJSON(text: string) {
   if (!text) throw new Error("Empty AI model response");

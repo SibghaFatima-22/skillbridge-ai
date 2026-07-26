@@ -24,7 +24,7 @@ function getGeminiClient() {
     }
   });
 }
-var AI_MODEL = "gemini-2.5-flash";
+var AI_MODEL = "gemini-flash-latest";
 function extractAndParseJSON(text) {
   if (!text) throw new Error("Empty AI model response");
   let str = text.trim();
