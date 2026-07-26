@@ -77,18 +77,23 @@ async function generateAIContentWithFallback(prompt, schema) {
         config
       });
       const timeoutPromise = new Promise(
-        (_, reject) => setTimeout(() => reject(new Error("Gemini request timed out after 7 seconds")), 7e3)
+        (_, reject) => setTimeout(() => reject(new Error("Gemini request timed out after 30 seconds")), 3e4)
       );
       const response = await Promise.race([generatePromise, timeoutPromise]);
       if (response && response.text) {
         return extractAndParseJSON(response.text);
       }
     } catch (err) {
-      lastError = err;
-      const isQuota = err?.status === 429 || String(err?.message || "").includes("quota") || String(err?.message || "").includes("429");
-      if (isQuota) {
-        console.info(`[Gemini AI] Model ${model} rate limited or quota exceeded.`);
+      console.error("========== GEMINI ERROR ==========");
+      console.dir(err, { depth: null });
+      console.error("Status:", err?.status);
+      console.error("Message:", err?.message);
+      console.error("Stack:", err?.stack);
+      if (err?.cause) {
+        console.error("Cause:", err.cause);
       }
+      console.error("==================================");
+      lastError = err;
     }
   }
   throw lastError || new Error("Gemini AI service temporarily unavailable");
@@ -965,7 +970,19 @@ User Question: ${userQuery}`;
       }
       throw new Error("Empty model response");
     } catch (geminiError) {
-      console.warn("Mentor chat Gemini generation failed, using dynamic mentor fallback:", geminiError);
+      console.error("======================================");
+      console.error("GEMINI FAILED");
+      console.error(geminiError);
+      if (geminiError?.message) {
+        console.error("Message:", geminiError.message);
+      }
+      if (geminiError?.status) {
+        console.error("Status:", geminiError.status);
+      }
+      if (geminiError?.stack) {
+        console.error(geminiError.stack);
+      }
+      console.error("======================================");
       const dynamicFallback = generateDynamicMentorFallback(userQuery, userContext);
       return res.json({
         success: true,

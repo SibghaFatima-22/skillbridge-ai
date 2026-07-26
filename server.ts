@@ -84,50 +84,50 @@ function extractAndParseJSON(text: string) {
 }
 
 async function generateAIContentWithFallback(prompt: string, schema?: any) {
+  console.log("STEP 1: Entered generateAIContentWithFallback");
+
   if (!process.env.GEMINI_API_KEY) {
     throw new Error("GEMINI_API_KEY environment variable is not configured.");
   }
+
+  console.log("STEP 2: API key found");
+
   const ai = getGeminiClient();
-  const modelsToTry = ["gemini-2.5-flash"];
 
-  let lastError: any = null;
-  for (const model of modelsToTry) {
-    try {
-      const config: any = { responseMimeType: "application/json" };
-      if (schema) config.responseSchema = schema;
+  console.log("STEP 3: Gemini client created");
 
-      const generatePromise = ai.models.generateContent({
-        model,
-        contents: prompt,
-        config,
-      });
+  try {
+    console.log("STEP 4: Calling Gemini...");
 
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Gemini request timed out after 30 seconds")), 30000)
-      );
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
 
-      const response: any = await Promise.race([generatePromise, timeoutPromise]);
+    console.log("STEP 5: Gemini returned successfully");
+    console.log("RAW RESPONSE:", response.text);
 
-      if (response && response.text) {
-        return extractAndParseJSON(response.text);
-      }
-    } catch (err: any) {
-  console.error("========== GEMINI ERROR ==========");
-  console.dir(err, { depth: null });
-  console.error("Status:", err?.status);
-  console.error("Message:", err?.message);
-  console.error("Stack:", err?.stack);
+    return {
+      replyMarkdown: response.text || "No response",
+      suggestedFollowUps: [],
+      keyTakeaway: "",
+    };
 
-  if (err?.cause) {
-    console.error("Cause:", err.cause);
+  } catch (err: any) {
+    console.error("========== GEMINI ERROR ==========");
+    console.dir(err, { depth: null });
+    console.error("Status:", err?.status);
+    console.error("Message:", err?.message);
+    console.error("Stack:", err?.stack);
+
+    if (err?.cause) {
+      console.error("Cause:", err.cause);
+    }
+
+    console.error("==================================");
+
+    throw err;
   }
-
-  console.error("==================================");
-
-  lastError = err;
-}
-  }
-  throw lastError || new Error("Gemini AI service temporarily unavailable");
 }
 
 function generateFallbackAssessment(body: any) {
