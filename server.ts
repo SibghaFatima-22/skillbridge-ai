@@ -83,7 +83,21 @@ function extractAndParseJSON(text: string) {
   throw new SyntaxError("Failed to parse valid JSON from AI output");
 }
 
-async function generateAIContentWithFallback(prompt: string, schema?: any) {
+/**
+ * Generic AI content generator with JSON-schema-aware fallback parsing.
+ *
+ * - Generic <T> so every call site can specify its own expected return shape
+ *   (e.g. generateAIContentWithFallback<InterviewReport>(prompt)).
+ * - When `schema` is passed, the Gemini call is configured for structured
+ *   JSON output and the response text is parsed (with robust fallback
+ *   extraction) before being returned as T.
+ * - When no schema is passed, the raw response text is returned as T
+ *   (useful for plain-markdown style endpoints).
+ */
+async function generateAIContentWithFallback<T = any>(
+  prompt: string,
+  schema?: any
+): Promise<T> {
   console.log("STEP 1: Entered generateAIContentWithFallback");
 
   if (!process.env.GEMINI_API_KEY) {
@@ -97,34 +111,57 @@ async function generateAIContentWithFallback(prompt: string, schema?: any) {
   console.log("STEP 3: Gemini client created");
 
   try {
-    console.log("STEP 4: Calling Gemini...");
+    console.log("========== PROMPT ==========");
+    console.log(prompt);
+    console.log("============================");
+
+    const config: any = {};
+
+    if (schema) {
+      config.responseMimeType = "application/json";
+      config.responseSchema = schema;
+    }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: AI_MODEL,
       contents: prompt,
+      ...(Object.keys(config).length ? { config } : {}),
     });
 
-    console.log("STEP 5: Gemini returned successfully");
-    console.log("RAW RESPONSE:", response.text);
+    console.log("========== GEMINI RESPONSE ==========");
+    console.log(response.text);
+    console.log("=====================================");
 
-    return {
-      replyMarkdown: response.text || "No response",
-      suggestedFollowUps: [],
-      keyTakeaway: "",
-    };
+    if (!response.text) {
+      throw new Error("Gemini returned an empty response.");
+    }
 
+    if (schema) {
+      return extractAndParseJSON(response.text) as T;
+    }
+
+    return response.text as unknown as T;
   } catch (err: any) {
     console.error("========== GEMINI ERROR ==========");
     console.dir(err, { depth: null });
+
     console.error("Status:", err?.status);
     console.error("Message:", err?.message);
-    console.error("Stack:", err?.stack);
 
-    if (err?.cause) {
-      console.error("Cause:", err.cause);
+    if (err?.error) {
+      console.error("Error JSON:", JSON.stringify(err.error, null, 2));
     }
 
-    console.error("==================================");
+    if (err?.response) {
+      console.error("Response:", JSON.stringify(err.response, null, 2));
+    }
+
+    if (err?.cause) {
+      console.error("Cause:");
+      console.dir(err.cause, { depth: null });
+    }
+
+    console.error("===================================");
 
     throw err;
   }
@@ -265,7 +302,7 @@ app.get("/api/health", (_req, res) => {
 app.post("/api/assessment/analyze", async (req, res) => {
   try {
     const { personalInfo, programmingSkills, frameworks, databases, tools, softSkills, careerGoals, learningStyle } = req.body;
-    
+
     const prompt = `You are an expert AI Career Coach for Computer Science students. Analyze the following student assessment profile and return a JSON object.
 
 Student Profile:
@@ -292,7 +329,17 @@ Return strictly valid JSON with this exact schema:
 }`;
 
     try {
-      const result = await generateAIContentWithFallback(prompt);
+      const result = await generateAIContentWithFallback<{
+        careerRecommendation: string;
+        overallScore: number;
+        careerReadiness: number;
+        strengths: string[];
+        weaknesses: string[];
+        missingSkills: string[];
+        estimatedLearningTime: string;
+        recommendedTechnologies: string[];
+        summary: string;
+      }>(prompt, { type: "object" });
       return res.json({ success: true, data: result });
     } catch (geminiError) {
       console.warn("Assessment using fallback response engine.");
@@ -358,7 +405,7 @@ Return strictly valid JSON with this exact schema:
 }`;
 
     try {
-      const result = await generateAIContentWithFallback(prompt);
+      const result = await generateAIContentWithFallback(prompt, { type: "object" });
       return res.json({ success: true, data: result });
     } catch (geminiError) {
       console.warn("Roadmap using fallback response engine.");
@@ -391,7 +438,7 @@ Return strictly valid JSON:
 }`;
 
     try {
-      const result = await generateAIContentWithFallback(prompt);
+      const result = await generateAIContentWithFallback(prompt, { type: "object" });
       return res.json({ success: true, data: result });
     } catch (geminiError) {
       console.warn("Resume enhance using fallback engine.");
@@ -445,7 +492,7 @@ Return strictly valid JSON:
 }`;
 
     try {
-      const result = await generateAIContentWithFallback(prompt);
+      const result = await generateAIContentWithFallback(prompt, { type: "object" });
       return res.json({ success: true, data: result });
     } catch (geminiError) {
       console.warn("Resume analyze using fallback engine.");
@@ -519,7 +566,12 @@ JSON Structure:
 }`;
 
     try {
-      const parsed = await generateAIContentWithFallback(prompt);
+      const parsed = await generateAIContentWithFallback<{
+        role: string;
+        interviewType: string;
+        difficulty: string;
+        questions: any[];
+      }>(prompt, { type: "object" });
       if (parsed?.questions && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
         return res.json({ success: true, data: parsed });
       }
@@ -535,7 +587,7 @@ JSON Structure:
 
 function generateFallbackQuestions(targetRole: string, interviewType: string, count: number) {
   const roleLower = targetRole.toLowerCase();
-  
+
   const catalog = [
     {
       id: "q1",
@@ -636,7 +688,7 @@ app.post("/api/interview/evaluate", async (req, res) => {
       "no clue", "pass", "skip", "i do not know", "i have no idea", "nothing",
       "na", "n/a", "i am not sure", "dont know", "not aware"
     ];
-    
+
     const isIDK = IDK_PATTERNS.some(p => trimmed === p || trimmed.startsWith("i don't know") || trimmed.startsWith("idk") || trimmed.startsWith("no idea") || trimmed.startsWith("i do not know")) || trimmed.length < 6;
 
     if (isIDK) {
@@ -684,7 +736,7 @@ Return strictly valid JSON:
 }`;
 
     try {
-      const parsed = await generateAIContentWithFallback(prompt);
+      const parsed = await generateAIContentWithFallback(prompt, { type: "object" });
       return res.json({ success: true, data: parsed });
     } catch (geminiError) {
       // Calculate intelligent fallback based on length & technical keyword density
@@ -704,7 +756,7 @@ Return strictly valid JSON:
           technicalAccuracyScore: Math.round(score * 0.95),
           confidenceScore: Math.round(score * 0.85),
           problemSolvingScore: Math.round(score * 0.9),
-          feedback: score < 30 
+          feedback: score < 30
             ? "Response was too short or lacked essential technical details."
             : "Decent attempt. Expand on technical trade-offs and concrete implementation details to boost your score.",
           missingKeyPoints: ["In-depth architectural mechanics", "Quantitative performance metrics"],
@@ -770,7 +822,7 @@ Return strictly valid JSON:
 }`;
 
     try {
-      const parsed = await generateAIContentWithFallback(prompt);
+      const parsed = await generateAIContentWithFallback<any>(prompt, { type: "object" });
 
       // Ensure mathematical alignment of overallScore & hiringVerdict based on actual responses
       let realSum = 0;
@@ -1017,12 +1069,39 @@ app.post("/api/mentor/chat", async (req, res) => {
     const userQuery = req.body.message || req.body.query || req.body.text || "How can I advance my CS career?";
     const { conversationHistory = [], userContext = {} } = req.body;
 
-    const systemInstruction = `You are SkillBridge AI - an empathetic, razor-sharp, 24/7 AI Career Mentor for Computer Science students.
-User Career Goal: ${userContext.careerGoal || userContext.targetCareer || "Software Engineer"}
-User Level: ${userContext.experienceLevel || "CS Student"}
-User Skills: ${JSON.stringify(userContext.skills || [])}
+    const systemInstruction = `
+You are Ali, the AI mentor inside SkillBridge AI.
 
-Provide direct, actionable, encouraging, and clear career advice, technical explanations, interview prep guidance, code reviews, or roadmap tips specifically answering: "${userQuery}". Keep responses concise, well-structured with markdown headings or bullet points where appropriate. Be empathetic yet realistic about industry standards.`;
+About the user:
+- Career Goal: ${userContext.careerGoal || userContext.targetCareer || "Software Engineer"}
+- Experience Level: ${userContext.experienceLevel || "CS Student"}
+- Skills: ${JSON.stringify(userContext.skills || [])}
+
+Your job is to answer ONLY the user's current question.
+
+Rules:
+1. If the user greets you (Hi, Hello, Hey), greet them naturally.
+2. If the user asks a technical question, explain it with examples.
+3. If the user asks about interviews, resumes, careers, projects, roadmaps, or jobs, answer those topics directly.
+4. Never rename or reinterpret the user's question.
+5. Never force every response into career advice.
+6. Never always use headings like "Strategic Advice", "Portfolio Projects", or "Production Best Practices".
+7. Answer naturally like ChatGPT.
+8. Use markdown only when it improves readability.
+9. Keep answers concise unless the user asks for detail.
+
+Return ONLY valid JSON in this exact format:
+
+{
+  "replyMarkdown": "Your complete answer in Markdown.",
+  "suggestedFollowUps": [
+    "Follow-up question 1",
+    "Follow-up question 2",
+    "Follow-up question 3"
+  ],
+  "keyTakeaway": "One short takeaway."
+}
+`;
 
     const formattedHistory = Array.isArray(conversationHistory)
       ? conversationHistory.map((h: any) => `${h.role || h.sender || "user"}: ${h.text || h.content || ""}`).join("\n")
@@ -1031,50 +1110,54 @@ Provide direct, actionable, encouraging, and clear career advice, technical expl
     const fullPrompt = `${systemInstruction}\n\nRecent History:\n${formattedHistory}\n\nUser Question: ${userQuery}`;
 
     const mentorSchema = {
-  type: "object",
-  properties: {
-    replyMarkdown: { type: "string" },
-    suggestedFollowUps: {
-      type: "array",
-      items: { type: "string" }
-    },
-    keyTakeaway: { type: "string" }
-  },
-  required: ["replyMarkdown", "suggestedFollowUps", "keyTakeaway"]
-};
+      type: "object",
+      properties: {
+        replyMarkdown: { type: "string" },
+        suggestedFollowUps: {
+          type: "array",
+          items: { type: "string" }
+        },
+        keyTakeaway: { type: "string" }
+      },
+      required: ["replyMarkdown", "suggestedFollowUps", "keyTakeaway"]
+    };
 
-   try {
-      const result = await generateAIContentWithFallback(fullPrompt, mentorSchema);
+    try {
+      const result = await generateAIContentWithFallback<{
+        replyMarkdown: string;
+        suggestedFollowUps: string[];
+        keyTakeaway: string;
+      }>(fullPrompt, mentorSchema);
       if (result && result.replyMarkdown) {
         return res.json({ success: true, data: result });
       }
       throw new Error("Empty model response");
-   } catch (geminiError: any) {
-    console.error("======================================");
-    console.error("GEMINI FAILED");
-    console.error(geminiError);
+    } catch (geminiError: any) {
+      console.error("======================================");
+      console.error("GEMINI FAILED");
+      console.error(geminiError);
 
-    if (geminiError?.message) {
+      if (geminiError?.message) {
         console.error("Message:", geminiError.message);
-    }
+      }
 
-    if (geminiError?.status) {
+      if (geminiError?.status) {
         console.error("Status:", geminiError.status);
-    }
+      }
 
-    if (geminiError?.stack) {
+      if (geminiError?.stack) {
         console.error(geminiError.stack);
-    }
+      }
 
-    console.error("======================================");
+      console.error("======================================");
 
-    const dynamicFallback = generateDynamicMentorFallback(userQuery, userContext);
+      const dynamicFallback = generateDynamicMentorFallback(userQuery, userContext);
 
-    return res.json({
+      return res.json({
         success: true,
         data: dynamicFallback
-    });
-}
+      });
+    }
   } catch (error: any) {
     const userQuery = req.body?.message || req.body?.query || "Career Guidance";
     res.json({
@@ -1082,9 +1165,6 @@ Provide direct, actionable, encouraging, and clear career advice, technical expl
       data: generateDynamicMentorFallback(userQuery, req.body?.userContext)
     });
   }
-
-    
-  
 });
 
 // 7. GitHub Profile Analyzer AI
@@ -1227,7 +1307,7 @@ Return strictly valid JSON with this EXACT structure:
 }`;
 
     try {
-      const parsed = await generateAIContentWithFallback(prompt);
+      const parsed = await generateAIContentWithFallback<any>(prompt, { type: "object" });
 
       // Ensure profile metrics are dynamically adjusted based on actual profile metadata if needed
       const seed = cleanUser.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
@@ -1264,7 +1344,7 @@ function generateFallbackGitHubAnalysis(cleanUser: string, userDetails: any, rep
   const reposCount = userDetails?.public_repos || (repoSummaries.length > 0 ? repoSummaries.length : 6);
   const followers = userDetails?.followers || 18;
   const following = userDetails?.following || 10;
-  
+
   const langCounts: Record<string, number> = {};
   if (repoSummaries.length > 0) {
     repoSummaries.forEach(r => {
@@ -1282,17 +1362,17 @@ function generateFallbackGitHubAnalysis(cleanUser: string, userDetails: any, rep
     percentage: Math.round((count / totalLangs) * 100)
   }));
 
-  const projectRatings = repoSummaries.length > 0 
+  const projectRatings = repoSummaries.length > 0
     ? repoSummaries.map((r, idx) => {
         let baseScore = 72;
-        
+
         // 1. Description completeness
         if (r.description && r.description.length > 30) baseScore += 6;
         else if (r.description && r.description.length > 10) baseScore += 3;
-        
+
         // 2. Stars & Forks impact
         baseScore += Math.min(12, (r.stars || 0) * 2 + (r.forks || 0) * 3);
-        
+
         // 3. Topics / Tagging
         if (r.topics && r.topics.length > 0) baseScore += Math.min(8, r.topics.length * 2);
 
@@ -1317,7 +1397,7 @@ function generateFallbackGitHubAnalysis(cleanUser: string, userDetails: any, rep
         // 6. Name character hash variation to ensure distinct score per repository
         const nameHash = (r.name || "").split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
         const pseudoVariation = ((nameHash + idx * 7) % 13) - 6; // -6 to +6
-        
+
         const finalScore = Math.min(96, Math.max(64, baseScore + pseudoVariation));
 
         const strengths = [];
@@ -1387,7 +1467,7 @@ function generateFallbackGitHubAnalysis(cleanUser: string, userDetails: any, rep
   const avgProjectScore = Math.round(
     projectRatings.reduce((sum, p) => sum + p.score, 0) / (projectRatings.length || 1)
   );
-  
+
   // Hash seed from username for natural deterministic variations across different handles
   const userSeed = cleanUser.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
 
@@ -1486,7 +1566,7 @@ Return strictly valid JSON array of recommended jobs:
 }`;
 
     try {
-      const result = await generateAIContentWithFallback(prompt);
+      const result = await generateAIContentWithFallback(prompt, { type: "object" });
       return res.json({ success: true, data: result });
     } catch (geminiError) {
       console.warn("Job matcher using fallback engine.");
@@ -1563,7 +1643,7 @@ Return strictly valid JSON:
 }`;
 
     try {
-      const result = await generateAIContentWithFallback(prompt);
+      const result = await generateAIContentWithFallback(prompt, { type: "object" });
       return res.json({ success: true, data: result });
     } catch (geminiError) {
       console.warn("Dashboard insights using fallback engine.");
@@ -1595,14 +1675,14 @@ Return strictly valid JSON:
 // Vite Integration for Dev / Static serving for production
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
-   const { createServer } = await import("vite");
+    const { createServer } = await import("vite");
 
-const vite = await createServer({
-  server: {
-    middlewareMode: true,
-  },
-  appType: "spa",
-});
+    const vite = await createServer({
+      server: {
+        middlewareMode: true,
+      },
+      appType: "spa",
+    });
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
@@ -1622,7 +1702,3 @@ if (!process.env.VERCEL) {
 }
 
 export default app;
-
-
-
-
