@@ -4,8 +4,7 @@
 
 > **SkillBridge AI** is an intelligent, full-stack career platform that bridges the gap between computer science education and production-grade engineering standards. Powered by Google's **Gemini API**, it delivers automated diagnostic assessments, dynamic learning roadmaps, real-time AI mock interviews with voice dictation, ATS resume scanning, and AI-driven job matching — all in one place.
 
-**🔗 Live App:** **[Launch SkillBridge AI](skillbridge-ai-three-zeta.vercel.app
-)**
+**🔗 Live App:** **[Launch SkillBridge AI](https://skillbridge-ai-three-zeta.vercel.app/)**
 
 ---
 
@@ -40,7 +39,7 @@
 
 ## 🌐 Live Application
 
-**Production:** skillbridge-ai-three-zeta.vercel.app 
+**Production:** https://skillbridge-ai-three-zeta.vercel.app/
 
 ---
 
