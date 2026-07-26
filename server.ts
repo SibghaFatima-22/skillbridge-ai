@@ -1123,15 +1123,18 @@ Return ONLY valid JSON in this exact format:
     };
 
     try {
-      const result = await generateAIContentWithFallback<{
-        replyMarkdown: string;
-        suggestedFollowUps: string[];
-        keyTakeaway: string;
-      }>(fullPrompt, mentorSchema);
-      if (result && result.replyMarkdown) {
-        return res.json({ success: true, data: result });
-      }
-      throw new Error("Empty model response");
+     const result = await generateAIContentWithFallback(fullPrompt, mentorSchema);
+
+console.log("Gemini Result:", result);
+
+if (result && result.replyMarkdown) {
+  return res.json({
+    success: true,
+    data: result,
+  });
+}
+
+throw new Error("Empty model response");
     } catch (geminiError: any) {
       console.error("======================================");
       console.error("GEMINI FAILED");
