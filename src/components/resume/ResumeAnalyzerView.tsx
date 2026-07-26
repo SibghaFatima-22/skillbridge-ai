@@ -23,23 +23,36 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({ addNotif
   const [targetJobTitle, setTargetJobTitle] = useState("Backend Engineer");
   const [loading, setLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleAnalyze = async () => {
     if (!resumeText.trim()) return;
     setLoading(true);
-    const data = await analyzeResumeAPI({
-      resumeContent: resumeText,
-      targetJobTitle,
-    });
-    setAnalysisResult(data);
-    setLoading(false);
+    setErrorMsg(null);
+    try {
+      const data = await analyzeResumeAPI({
+        resumeContent: resumeText,
+        targetJobTitle,
+      });
 
-    if (addNotification && data) {
-      addNotification(
-        "Resume ATS Scan Complete 📄",
-        `ATS Match Score for ${targetJobTitle}: ${data.atsScore || 82}%. ${data.improvements?.length || 0} areas flagged for optimization.`,
-        "success"
-      );
+      if (!data) {
+        throw new Error("No data returned from analysis API");
+      }
+
+      setAnalysisResult(data);
+
+      if (addNotification) {
+        addNotification(
+          "Resume ATS Scan Complete 📄",
+          `ATS Match Score for ${targetJobTitle}: ${data.atsScore ?? 82}%. ${data.improvements?.length || 0} areas flagged for optimization.`,
+          "success"
+        );
+      }
+    } catch (err) {
+      console.error("Resume analysis failed:", err);
+      setErrorMsg("We couldn't analyze your resume right now. Please try again in a moment.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -87,6 +100,13 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({ addNotif
             />
           </div>
 
+          {errorMsg && (
+            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
           <button
             onClick={handleAnalyze}
             disabled={loading}
@@ -110,23 +130,23 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({ addNotif
               </div>
 
               <div className="flex items-center gap-6">
-                <div className="text-5xl font-black text-blue-400">{analysisResult.atsScore}%</div>
-                <p className="text-xs text-slate-300 leading-relaxed">{analysisResult.summary}</p>
+                <div className="text-5xl font-black text-blue-400">{analysisResult.atsScore ?? "--"}%</div>
+                <p className="text-xs text-slate-300 leading-relaxed">{analysisResult.summary || "Analysis complete."}</p>
               </div>
 
               {/* Breakdown Grid */}
               <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-800 text-center">
                 <div className="p-2.5 rounded-xl bg-slate-800/60">
                   <div className="text-[10px] text-slate-400 font-medium">Keywords</div>
-                  <div className="text-base font-bold text-white mt-0.5">{analysisResult.keywordScore}%</div>
+                  <div className="text-base font-bold text-white mt-0.5">{analysisResult.keywordScore ?? "--"}%</div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-slate-800/60">
                   <div className="text-[10px] text-slate-400 font-medium">Grammar</div>
-                  <div className="text-base font-bold text-white mt-0.5">{analysisResult.grammarScore}%</div>
+                  <div className="text-base font-bold text-white mt-0.5">{analysisResult.grammarScore ?? "--"}%</div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-slate-800/60">
                   <div className="text-[10px] text-slate-400 font-medium">Format</div>
-                  <div className="text-base font-bold text-white mt-0.5">{analysisResult.formattingScore}%</div>
+                  <div className="text-base font-bold text-white mt-0.5">{analysisResult.formattingScore ?? "--"}%</div>
                 </div>
               </div>
             </div>
@@ -137,11 +157,14 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({ addNotif
                 <AlertCircle className="w-4 h-4 text-amber-500" /> Missing ATS Keywords for {targetJobTitle}
               </h3>
               <div className="flex flex-wrap gap-2">
-                {analysisResult.missingKeywords.map((kw: string, i: number) => (
+                {(analysisResult.missingKeywords || []).map((kw: string, i: number) => (
                   <span key={i} className="px-3 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40 text-xs font-semibold">
                     + {kw}
                   </span>
                 ))}
+                {(!analysisResult.missingKeywords || analysisResult.missingKeywords.length === 0) && (
+                  <span className="text-xs text-slate-400 italic">No missing keywords detected.</span>
+                )}
               </div>
             </div>
 
@@ -151,12 +174,15 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({ addNotif
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Actionable Improvements
               </h3>
               <ul className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
-                {analysisResult.improvements.map((imp: string, i: number) => (
+                {(analysisResult.improvements || []).map((imp: string, i: number) => (
                   <li key={i} className="flex items-start gap-2">
                     <span className="text-emerald-500 font-bold">•</span>
                     <span>{imp}</span>
                   </li>
                 ))}
+                {(!analysisResult.improvements || analysisResult.improvements.length === 0) && (
+                  <li className="text-slate-400 italic">No specific improvements flagged.</li>
+                )}
               </ul>
             </div>
           </div>

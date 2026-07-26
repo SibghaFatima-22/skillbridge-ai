@@ -496,8 +496,35 @@ Return strictly valid JSON:
   "suggestedSkills": ["skill1", "skill2", ...]
 }`;
 
+    const resumeAnalyzeSchema = {
+      type: "object",
+      properties: {
+        atsScore: { type: "number" },
+        grammarScore: { type: "number" },
+        keywordScore: { type: "number" },
+        formattingScore: { type: "number" },
+        overallReadiness: { type: "number" },
+        summary: { type: "string" },
+        strongSections: { type: "array", items: { type: "string" } },
+        weakSections: { type: "array", items: { type: "string" } },
+        missingKeywords: { type: "array", items: { type: "string" } },
+        improvements: { type: "array", items: { type: "string" } },
+        improvedSummary: { type: "string" },
+        suggestedSkills: { type: "array", items: { type: "string" } }
+      },
+      required: [
+        "atsScore", "grammarScore", "keywordScore", "formattingScore",
+        "overallReadiness", "summary", "strongSections", "weakSections",
+        "missingKeywords", "improvements", "improvedSummary", "suggestedSkills"
+      ]
+    };
+
     try {
-      const result: any = await generateAIContentWithFallback(prompt, { type: "object" });
+      // Passing { type: "object" } with no properties gives Gemini no
+      // structural guidance, and it can return an essentially empty {}.
+      // A real schema with properties + required forces the model to
+      // populate every field.
+      const result: any = await generateAIContentWithFallback(prompt, resumeAnalyzeSchema);
 
       // Gemini's responseSchema here is just { type: "object" } with no
       // enforced properties, so array fields can come back missing. The
