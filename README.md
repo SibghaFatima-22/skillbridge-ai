@@ -2,7 +2,7 @@
 
 ![SkillBridge AI Banner](./src/assets/images/skillbridge_logo_1784917378061.jpg)
 
-> **SkillBridge AI** is an intelligent, full-stack career platform that bridges the gap between computer science education and production-grade engineering standards. Powered by Google's **Gemini API**, it delivers automated diagnostic assessments, dynamic learning roadmaps, real-time AI mock interviews with voice dictation, ATS resume scanning, and AI-driven job matching — all in one place.
+> **SkillBridge AI** is an intelligent, full-stack career platform that helps computer science students become job-ready software engineers through personalized AI-powered assessments, career roadmaps, ATS resume optimization, AI mock interviews, GitHub portfolio analysis, and intelligent job matching. Powered by Google's **Gemini API**, SkillBridge AI provides personalized guidance that helps users identify skill gaps, build industry-ready competencies, and confidently prepare for software engineering careers.
 
 **🔗 Live App:** **[Launch SkillBridge AI](https://skillbridge-ai-three-zeta.vercel.app/)**
 
@@ -10,15 +10,19 @@
 
 ## 📌 Table of Contents
 
-- [The Problem & Who It's For](#-the-problem--who-its-for)
-- [Live Application](#-live-application)
-- [Features](#-features)
-- [The AI Feature: How It Works](#-the-ai-feature-how-it-works)
-- [Tech Stack](#️-tech-stack--architecture)
-- [Screenshots](#-screenshots)
-- [Getting Started](#-getting-started)
-- [Deployment](#-deploying-to-vercel)
-- [License](#-license)
+* [The Problem & Who It's For](#-the-problem--who-its-for)
+* [Live Application](#-live-application)
+* [Features](#-features)
+* [The AI Feature: How It Works](#-the-ai-feature-how-it-works)
+* [Tech Stack & Architecture](#️-tech-stack--architecture)
+* [Project Architecture](#️-project-architecture)
+* [Screenshots](#-screenshots)
+* [Getting Started](#-getting-started)
+* [Deploying to Vercel](#-deploying-to-vercel)
+* [Security](#-security)
+* [Future Improvements](#-future-improvements)
+* [License](#-license)
+
 
 ---
 
@@ -37,9 +41,11 @@
 
 ---
 
-## 🌐 Live Application
+## 🌐 Live Demo
 
-**Production:** https://skillbridge-ai-three-zeta.vercel.app/
+**Live Application:**
+
+https://skillbridge-ai-three-zeta.vercel.app/
 
 ---
 
@@ -76,7 +82,7 @@
 
 ## 🤖 The AI Feature: How It Works
 
-SkillBridge AI's intelligence layer runs on **Google's Gemini API (`gemini-3.6-flash`)**, called securely **server-side** via Node.js/Express (never exposed to the client). Every single AI call enforces **strict JSON schema output** (`responseMimeType: "application/json"`), so the model's response can be parsed and rendered directly into the UI — no free-text guesswork, no brittle regex parsing.
+SkillBridge AI's intelligence layer runs on **Google's Gemini API (`gemini-flash-latest`)**, called securely **server-side** via Node.js/Express (never exposed to the client). Every single AI call enforces **strict JSON schema output** (`responseMimeType: "application/json"`), so the model's response can be parsed and rendered directly into the UI — no free-text guesswork, no brittle regex parsing.
 
 There are **nine** distinct AI-powered workflows, each with its own purpose-built system prompt:
 
@@ -222,7 +228,7 @@ Provide direct, actionable, encouraging, and clear career advice, technical expl
 
 | Category | Technology |
 | :--- | :--- |
-| **AI Model & SDK** | Google Gemini API — `gemini-3.6-flash` (`@google/genai`), called server-side with strict JSON schema enforcement |
+| **AI Model & SDK** | Google Gemini API — `gemini-flash-latest` (`@google/genai`), called server-side with strict JSON schema enforcement |
 | **Frontend Runtime** | React 18, TypeScript, Vite |
 | **Styling & Icons** | Tailwind CSS v4, Lucide React Icons |
 | **Data Visualization** | Recharts (Radar, Area & Bar visualizers) |
@@ -232,6 +238,48 @@ Provide direct, actionable, encouraging, and clear career advice, technical expl
 | **Backend API Server** | Node.js, Express, ESBuild |
 | **Database & Persistence** | Firebase Firestore (with LocalStorage fallback) |
 | **Deployment** | Google Cloud Run & Vercel Serverless |
+
+---
+
+
+## 🏗️ Project Architecture
+
+```text
+                           ┌─────────────────────────────┐
+                           │           User              │
+                           └──────────────┬──────────────┘
+                                          │
+                                          ▼
+                           ┌─────────────────────────────┐
+                           │ React + TypeScript + Vite   │
+                           │      Tailwind CSS UI        │
+                           └──────────────┬──────────────┘
+                                          │
+                              API Requests │
+                                          ▼
+                           ┌─────────────────────────────┐
+                           │    Express Server / API     │
+                           │ Server-side Business Logic  │
+                           └───────┬─────────┬───────────┘
+                                   │         │
+                        AI Requests │         │ Database Operations
+                                   ▼         ▼
+                     ┌──────────────────┐   ┌─────────────────────┐
+                     │ Google Gemini API│   │ Firebase Firestore  │
+                     │ gemini-flash-latest │ │ User Data & Storage │
+                     └──────────────────┘   └─────────────────────┘
+```
+---
+
+### Architecture Overview
+
+SkillBridge AI follows a modern full-stack architecture designed for scalability, security, and maintainability.
+
+* **Frontend:** Built with React, TypeScript, Vite, and Tailwind CSS to deliver a fast, responsive, and interactive user experience.
+* **Backend:** Node.js and Express handle all server-side logic, API endpoints, AI orchestration, and data processing.
+* **AI Layer:** Google Gemini (`gemini-flash-latest`) powers career diagnostics, roadmap generation, resume analysis, interview coaching, GitHub portfolio analysis, and the AI mentor.
+* **Database:** Firebase Firestore securely stores user profiles, assessments, roadmaps, interview history, and application data.
+* **Deployment:** The frontend is deployed on Vercel, while backend services are hosted on Google Cloud Run.
 
 ---
 
@@ -261,7 +309,7 @@ Provide direct, actionable, encouraging, and clear career advice, technical expl
 
 ### 1. Clone & Install
 ```bash
-git clone https://github.com/your-username/skillbridge-ai.git
+git clone https://github.com/SibghaFatima-22/skillbridge-ai.git
 cd skillbridge-ai
 npm install
 ```
@@ -297,6 +345,35 @@ SkillBridge AI ships pre-configured with `vercel.json` and serverless API handle
    - Key: `GEMINI_API_KEY`
    - Value: your Gemini API key from Google AI Studio
 4. **Deploy** — Vercel automatically builds the static React frontend and deploys the Express API endpoints as Serverless Functions.
+
+---
+
+# 🔒 Security
+
+Security was considered throughout the development of SkillBridge AI.
+
+* API keys and sensitive credentials are stored securely using environment variables and are **never committed** to the GitHub repository.
+* All AI requests are processed securely on the server using Express, ensuring API keys are never exposed to the client.
+* Firebase Firestore enforces secure data storage and access rules for user information.
+* Sensitive configuration values are managed through deployment platform environment variables (Vercel and Google Cloud Run).
+* The repository intentionally excludes secrets, credentials, and configuration files using `.gitignore` to follow secure development best practices.
+
+---
+
+# 🚀 Future Improvements
+
+SkillBridge AI is designed to continue evolving with additional AI-powered capabilities. Planned future enhancements include:
+
+* 💻 AI Coding Challenge Generator with automated code evaluation.
+* 🤝 Team collaboration and mentor dashboards for universities and bootcamps.
+* 👨‍💼 Recruiter Portal for reviewing candidate profiles and AI-generated reports.
+* 🔗 LinkedIn Profile Analyzer with personalized optimization recommendations.
+* 🌍 Multi-language interview support for global users.
+* 📱 Progressive Web App (PWA) and mobile application support.
+* 📅 AI-powered study planner with calendar integration and smart reminders.
+* 📈 Advanced analytics dashboard to track long-term career progress.
+* 🎓 Integration with online learning platforms to recommend personalized courses.
+* 🧠 Enhanced AI career mentor with long-term memory and personalized coaching based on user progress.
 
 ---
 
