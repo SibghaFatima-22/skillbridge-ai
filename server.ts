@@ -112,12 +112,20 @@ async function generateAIContentWithFallback(prompt: string, schema?: any) {
         return extractAndParseJSON(response.text);
       }
     } catch (err: any) {
-      lastError = err;
-      const isQuota = err?.status === 429 || String(err?.message || "").includes("quota") || String(err?.message || "").includes("429");
-      if (isQuota) {
-        console.info(`[Gemini AI] Model ${model} rate limited or quota exceeded.`);
-      }
-    }
+  console.error("========== GEMINI ERROR ==========");
+  console.dir(err, { depth: null });
+  console.error("Status:", err?.status);
+  console.error("Message:", err?.message);
+  console.error("Stack:", err?.stack);
+
+  if (err?.cause) {
+    console.error("Cause:", err.cause);
+  }
+
+  console.error("==================================");
+
+  lastError = err;
+}
   }
   throw lastError || new Error("Gemini AI service temporarily unavailable");
 }
