@@ -836,116 +836,51 @@ function generateFallbackInterviewReport(payload) {
     questionSummaries
   };
 }
-function cleanTopicSubject(rawQuery) {
-  let s = String(rawQuery || "").trim();
-  s = s.replace(/["'“”`]/g, " ");
-  let prev = "";
-  while (s !== prev) {
-    prev = s;
-    s = s.replace(/^(how do i|what are|what is|how to|tell me about|can you|explain|what projects|how can i|what should i|why is|why do|what are common pitfalls|pitfalls or mistakes to avoid with|what projects can i build|how do i explain)\s*/gi, "");
-  }
-  s = s.replace(/(in a technical interview|for a software engineer|for a backend engineer|in an interview|for cs students|to avoid|pitfalls|mistakes|for scale|in production|with|about)\??$/gi, "");
-  s = s.trim();
-  const words = s.split(/\s+/).filter((w) => w.length > 2 && !["how", "what", "can", "you", "tell", "about", "the", "for", "with", "and", "does", "explain", "give", "help", "need", "should", "avoid", "pitfalls", "common", "demonstrate", "build"].includes(w.toLowerCase()));
-  if (words.length > 0) {
-    return words.slice(0, 3).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
-  }
-  return "Backend Engineering";
-}
 function generateDynamicMentorFallback(query, userContext = {}) {
   const q = String(query || "").trim();
-  const lowerQ = q.toLowerCase();
   const career = userContext?.careerGoal || userContext?.targetCareer || "Software Engineer";
-  const cleanSubject = cleanTopicSubject(q);
-  let replyMarkdown = "";
-  let followUps = [];
-  let keyTakeaway = "";
-  if (lowerQ.includes("project") || lowerQ.includes("portfolio") || lowerQ.includes("github") || lowerQ.includes("build")) {
-    replyMarkdown = `### \u{1F680} Recommended Portfolio Projects for ${career}
+  if (/^(hi|hello|hey|good morning|good afternoon|good evening)$/i.test(q)) {
+    return {
+      replyMarkdown: `# \u{1F44B} Hello!
 
-To stand out to engineering recruiters, avoid basic tutorial clones. Focus on building production-ready projects with real backend depth:
+I'm **Ali**, your AI Career Coach.
 
-#### 1. Distributed Task Queue & Asynchronous Webhook Gateway
-- **Tech Stack**: Node.js / TypeScript, Express, Redis, BullMQ, PostgreSQL, Docker.
-- **Key Features**: Idempotent webhook processing, rate-limiting middleware, background worker retry queues with exponential backoff, and Prometheus metrics.
-- **Why Recruiters Love It**: Demonstrates non-blocking async architecture, queuing systems, and resilient error recovery under high concurrency.
+I'm here to help you with:
 
-#### 2. Full-Stack Collaborative Workspace App
-- **Tech Stack**: React, Node.js / Express, WebSockets (Socket.io), Firestore / PostgreSQL, Cloud Run.
-- **Key Features**: User authentication (JWT / OAuth2), real-time document synchronization, role-based access control (RBAC), and automated unit tests with Jest.
-- **Why Recruiters Love It**: Proves full-stack proficiency, state management, security best practices, and live deployment capability.
+- Programming concepts
+- React, Node.js, JavaScript, TypeScript
+- DSA & Algorithms
+- System Design
+- Interview preparation
+- Resume reviews
+- Career guidance
+- Project ideas
 
-#### 3. Key Portfolio Best Practices
-- **Comprehensive README**: Include an architecture diagram, setup instructions, API schema docs, and a **live deployed demo URL**.
-- **Testing & CI/CD**: Write unit and integration tests (Supertest) and set up GitHub Actions to run linters on pull requests.`;
-    followUps = [
-      "How do I write an impressive GitHub README for my portfolio?",
-      "How should I explain my project architecture in a technical interview?",
-      "What are essential unit testing best practices for backend APIs?"
-    ];
-    keyTakeaway = "A live deployed full-stack app with containerization, test coverage, and clear architecture documentation is the strongest hiring signal.";
-  } else if (lowerQ.includes("prepare") || lowerQ.includes("interview") || lowerQ.includes("behavioral") || lowerQ.includes("tell me about yourself") || lowerQ.includes("mock")) {
-    replyMarkdown = `### \u{1F3AF} Technical & Behavioral Interview Preparation Masterclass
-
-Preparing effectively for ${career} interviews requires balancing technical rigor with structured communication:
-
-#### 1. Structure Behavioral & Experience Answers with the STAR Method
-- **Situation & Task**: Set the technical context in 2 sentences (e.g., *"Our API latency spiked to 1.2s under load during a user migration"*).
-- **Action (70% of response)**: Detail your specific engineering contributions (e.g., *"I ran EXPLAIN ANALYZE on PostgreSQL queries, identified missing foreign key indexes, and introduced a Redis caching layer"*).
-- **Result**: Quantify impact with metrics (e.g., *"Reduced P99 latency by 65% and handled 10k concurrent requests"*).
-
-#### 2. Technical & Coding Interview Strategy
-- **Clarify Requirements**: Always ask clarifying questions about traffic scale, latency requirements, and data consistency before writing code.
-- **Speak Your Thought Process**: Never code in silence. Articulate trade-offs out loud (e.g. memory usage vs time complexity).
-- **Check Edge Cases**: Validate empty inputs, boundary conditions, and null values before declaring completion.
-
-#### 3. Efficient Practice Plan
-- Focus on core patterns: Two Pointers, Sliding Window, Graph Traversals (BFS/DFS), and System Design building blocks (Caching, Load Balancing, DB Sharding).`;
-    followUps = [
-      "Can we do a quick practice mock interview question right now?",
-      "How do I answer 'What is your biggest weakness?' effectively?",
-      "How should I structure my answer for system design questions?"
-    ];
-    keyTakeaway = "Focusing on quantifiable impact, clear STAR response structure, and explicit technical trade-offs sets top candidates apart.";
-  } else if (lowerQ.includes("sql") || lowerQ.includes("postgres") || lowerQ.includes("database") || lowerQ.includes("index") || lowerQ.includes("query")) {
-    replyMarkdown = `### \u{1F5C4}\uFE0F PostgreSQL & Database Query Optimization Guide
-
-Optimizing database performance for ${cleanSubject} is a critical backend skill:
-
-1. **Execution Plan Inspection (\`EXPLAIN ANALYZE\`)**: Run \`EXPLAIN ANALYZE\` on slow queries to spot sequential table scans and excessive buffer reads.
-2. **Targeted B-Tree Indexing**: Add composite B-Tree indexes on columns heavily used in \`WHERE\` clauses, \`JOIN\` foreign keys, and \`ORDER BY\` sorting.
-3. **Connection Pooling**: Use PgBouncer or Knex/Drizzle connection pools to prevent connection overhead and exhaustion during high request spikes.
-4. **ACID Transactions**: Wrap interdependent queries inside atomic transactions with explicit rollback logic to guarantee data integrity.`;
-    followUps = [
-      "When should I choose composite multi-column indexes?",
-      "How does PostgreSQL query optimization differ from NoSQL databases?",
-      "How do zero-downtime database migrations work in production?"
-    ];
-    keyTakeaway = "Analyzing EXPLAIN query plans and maintaining proper foreign key indexing prevents system latency bottlenecks under scale.";
-  } else {
-    replyMarkdown = `### \u{1F4A1} Strategic Advice on ${cleanSubject}
-
-Regarding **${cleanSubject}** for an aspiring **${career}**:
-
-#### 1. Core Mechanics & Architecture
-Master the underlying mechanics of **${cleanSubject}** \u2014 how it executes at runtime, how data flows through the system, and its core design patterns.
-
-#### 2. Practical Hands-On Application
-Build a focused mini-module or integration showcasing **${cleanSubject}** in your portfolio project to demonstrate hands-on experience.
-
-#### 3. Interview Articulation
-Be prepared to explain why you chose **${cleanSubject}** over alternative approaches, highlighting key trade-offs in latency, memory efficiency, and maintainability.`;
-    followUps = [
-      `What are 3 unique project ideas for ${cleanSubject}?`,
-      `How do I explain ${cleanSubject} in a technical interview?`,
-      `What are key production best practices for ${cleanSubject}?`
-    ];
-    keyTakeaway = `Mastering ${cleanSubject} strengthens your technical depth and demonstrates strong engineering maturity for ${career} roles.`;
+What would you like to learn today?`,
+      suggestedFollowUps: [
+        "Explain React Hooks",
+        "Help me prepare for a backend interview",
+        "Suggest a portfolio project"
+      ],
+      keyTakeaway: "Ask me anything related to Computer Science."
+    };
   }
   return {
-    replyMarkdown,
-    suggestedFollowUps: followUps,
-    keyTakeaway
+    replyMarkdown: `Sorry, I couldn't generate an AI response right now.
+
+This usually happens because:
+
+- The AI service is temporarily unavailable
+- The API key quota has been exceeded
+- The request timed out
+
+Please try again in a few moments.`,
+    suggestedFollowUps: [
+      "Try again",
+      "Explain the topic in detail",
+      "Give me an example"
+    ],
+    keyTakeaway: "The AI service is temporarily unavailable."
   };
 }
 app.post("/api/mentor/chat", async (req, res) => {
@@ -960,81 +895,108 @@ About the user:
 - Experience Level: ${userContext.experienceLevel || "CS Student"}
 - Skills: ${JSON.stringify(userContext.skills || [])}
 
-Your job is to answer ONLY the user's current question.
+Your ONLY job is to answer the user's current question.
 
 Rules:
-1. If the user greets you (Hi, Hello, Hey), greet them naturally.
-2. If the user asks a technical question, explain it with examples.
-3. If the user asks about interviews, resumes, careers, projects, roadmaps, or jobs, answer those topics directly.
-4. Never rename or reinterpret the user's question.
-5. Never force every response into career advice.
-6. Never always use headings like "Strategic Advice", "Portfolio Projects", or "Production Best Practices".
-7. Answer naturally like ChatGPT.
-8. Use markdown only when it improves readability.
-9. Keep answers concise unless the user asks for detail.
 
-Return ONLY valid JSON in this exact format:
+1. If the user says "Hi", "Hello", or "Hey", greet them naturally.
+
+2. If they ask a programming question, explain it clearly with examples.
+
+3. If they ask about React, Node.js, JavaScript, TypeScript, databases, DSA, AI, web development, or any CS topic, teach the concept directly.
+
+4. If they ask about resumes, interviews, careers, jobs, projects, or roadmaps, answer those questions directly.
+
+5. NEVER rename the user's question.
+
+6. NEVER force every answer into career advice.
+
+7. NEVER use titles like:
+- Strategic Advice
+- Portfolio Projects
+- Production Best Practices
+
+unless the user specifically asks for them.
+
+8. Answer naturally like ChatGPT.
+
+9. Use Markdown only when it improves readability.
+
+Return ONLY valid JSON.
 
 {
-  "replyMarkdown": "Your complete answer in Markdown.",
+  "replyMarkdown": "string",
   "suggestedFollowUps": [
-    "Follow-up question 1",
-    "Follow-up question 2",
-    "Follow-up question 3"
+    "string",
+    "string",
+    "string"
   ],
-  "keyTakeaway": "One short takeaway."
+  "keyTakeaway": "string"
 }
 `;
-    const formattedHistory = Array.isArray(conversationHistory) ? conversationHistory.map((h) => `${h.role || h.sender || "user"}: ${h.text || h.content || ""}`).join("\n") : "";
-    const fullPrompt = `${systemInstruction}
+    const formattedHistory = Array.isArray(conversationHistory) ? conversationHistory.map(
+      (h) => `${h.role || h.sender || "user"}: ${h.text || h.content || ""}`
+    ).join("\n") : "";
+    const fullPrompt = `
+${systemInstruction}
 
-Recent History:
+Conversation History:
+
 ${formattedHistory}
 
-User Question: ${userQuery}`;
+User Question:
+
+${userQuery}
+`;
     const mentorSchema = {
       type: "object",
       properties: {
-        replyMarkdown: { type: "string" },
+        replyMarkdown: {
+          type: "string"
+        },
         suggestedFollowUps: {
           type: "array",
-          items: { type: "string" }
+          items: {
+            type: "string"
+          }
         },
-        keyTakeaway: { type: "string" }
+        keyTakeaway: {
+          type: "string"
+        }
       },
-      required: ["replyMarkdown", "suggestedFollowUps", "keyTakeaway"]
+      required: [
+        "replyMarkdown",
+        "suggestedFollowUps",
+        "keyTakeaway"
+      ]
     };
-    try {
-      const result = await generateAIContentWithFallback(fullPrompt, mentorSchema);
-      if (result && result.replyMarkdown) {
-        return res.json({ success: true, data: result });
-      }
-      throw new Error("Empty model response");
-    } catch (geminiError) {
-      console.error("======================================");
-      console.error("GEMINI FAILED");
-      console.error(geminiError);
-      if (geminiError?.message) {
-        console.error("Message:", geminiError.message);
-      }
-      if (geminiError?.status) {
-        console.error("Status:", geminiError.status);
-      }
-      if (geminiError?.stack) {
-        console.error(geminiError.stack);
-      }
-      console.error("======================================");
-      const dynamicFallback = generateDynamicMentorFallback(userQuery, userContext);
-      return res.json({
-        success: true,
-        data: dynamicFallback
-      });
+    console.log("========== CALLING GEMINI ==========");
+    const result = await generateAIContentWithFallback(
+      fullPrompt,
+      mentorSchema
+    );
+    console.log("========== GEMINI RESPONSE ==========");
+    console.dir(result, { depth: null });
+    if (!result) {
+      throw new Error("Gemini returned null");
     }
-  } catch (error) {
-    const userQuery = req.body?.message || req.body?.query || "Career Guidance";
-    res.json({
+    if (!result.replyMarkdown) {
+      throw new Error("replyMarkdown missing");
+    }
+    return res.json({
       success: true,
-      data: generateDynamicMentorFallback(userQuery, req.body?.userContext)
+      data: result
+    });
+  } catch (err) {
+    console.error("========== GEMINI FAILED ==========");
+    console.dir(err, { depth: null });
+    const userQuery = req.body.message || req.body.query || req.body.text || "Career Guidance";
+    return res.json({
+      success: true,
+      data: generateDynamicMentorFallback(
+        userQuery,
+        req.body.userContext || {}
+      )
     });
   }
 });
