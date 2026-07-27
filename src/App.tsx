@@ -7,7 +7,7 @@ import { AssessmentWizard } from "./components/assessment/AssessmentWizard";
 import { RoadmapView } from "./components/roadmap/RoadmapView";
 import { ResourcesView } from "./components/resources/ResourcesView";
 import { ResumeBuilderView } from "./components/resume/ResumeBuilderView";
-import { ResumeAnalyzerView } from "./components/resume/ResumeAnalyzerView";
+
 import { InterviewCoachView } from "./components/interview/InterviewCoachView";
 import { GithubAnalyzerView } from "./components/github/GithubAnalyzerView";
 import { AIMentorView } from "./components/mentor/AIMentorView";
@@ -317,9 +317,7 @@ export function App() {
               />
             )}
 
-            {activeTab === "resume-analyzer" && (
-              <ResumeAnalyzerView addNotification={addNotification} />
-            )}
+
 
             {activeTab === "interview" && (
               <InterviewCoachView addNotification={addNotification} user={user} />
