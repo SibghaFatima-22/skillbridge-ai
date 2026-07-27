@@ -60,18 +60,7 @@ export const ResumeBuilderView: React.FC<ResumeBuilderViewProps> = ({
     });
   };
 
-  const handleEnhanceSummary = async () => {
-    setEnhancingIndex(-1);
-    const result = await enhanceResumeAPI({
-      section: "Professional Summary",
-      rawText: resume.summary,
-      targetRole: user?.targetCareer || "Software Engineer",
-    });
-    if (result?.enhancedText) {
-      setResume({ ...resume, summary: result.enhancedText });
-    }
-    setEnhancingIndex(null);
-  };
+
 
   const handleEnhanceExperienceBullet = async (expIdx: number, bulletIdx: number) => {
     setEnhancingIndex(expIdx * 10 + bulletIdx);
@@ -687,14 +676,7 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
             <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-base text-slate-900 dark:text-white">Professional Summary</h3>
-                <button
-                  type="button"
-                  onClick={handleEnhanceSummary}
-                  className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40 text-xs font-semibold flex items-center gap-1.5 hover:bg-blue-100 transition-colors"
-                >
-                  {enhancingIndex === -1 ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
-                  <span>AI Enhance Summary</span>
-                </button>
+
               </div>
               <textarea
                 rows={4}
@@ -1114,8 +1096,8 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
                     type="button"
                     onClick={() => setResume({ ...resume, template: tpl.name as any })}
                     className={`p-3 rounded-xl border text-xs text-left transition-all ${resume.template === tpl.name
-                        ? "bg-blue-600 text-white border-blue-600 font-bold shadow-md shadow-blue-600/30"
-                        : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400"
+                      ? "bg-blue-600 text-white border-blue-600 font-bold shadow-md shadow-blue-600/30"
+                      : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400"
                       }`}
                   >
                     <div className="font-bold">{tpl.name}</div>
@@ -1139,8 +1121,8 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
                   key={preset}
                   onClick={() => setResume({ ...resume, template: preset as any })}
                   className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all ${resume.template === preset
-                      ? "bg-blue-600 text-white"
-                      : "bg-slate-800 text-slate-400 hover:text-white"
+                    ? "bg-blue-600 text-white"
+                    : "bg-slate-800 text-slate-400 hover:text-white"
                     }`}
                 >
                   {preset}
