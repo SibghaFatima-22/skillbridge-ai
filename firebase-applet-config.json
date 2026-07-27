@@ -1,12 +1,12 @@
 {
-  "projectId": "fast-zone-46pck",
-  "appId": "1:80688857320:web:3391d32d0ebab961fb895d",
-  "apiKey": "AIzaSyAO9fzxAquiVWwu1TF8Desn8mbnn5pn7AM",
-  "authDomain": "fast-zone-46pck.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-skillbridgeai-2e4af344-f32d-4807-b0b9-adf0c0d98e4f",
-  "storageBucket": "fast-zone-46pck.firebasestorage.app",
-  "messagingSenderId": "80688857320",
-  "measurementId": "",
-  "oAuthClientId": "80688857320-5getg04p70n52ursvmeidtp09a5g9a7s.apps.googleusercontent.com",
+  "apiKey": "AIzaSyCDPneNxF6SqowhkqUpy8OpGRqQ2tPSCuk",
+  "authDomain": "skillbridge-ai-cc7b4.firebaseapp.com",
+  "projectId": "skillbridge-ai-cc7b4",
+  "storageBucket": "skillbridge-ai-cc7b4.firebasestorage.app",
+  "messagingSenderId": "1095145556597",
+  "appId": "1:1095145556597:web:58c3e79df045e85693c63c",
+  "measurementId": "G-ZD72VVWJ0V",
+  "firestoreDatabaseId": "",
+  "oAuthClientId": "",
   "recaptchaSiteKey": ""
 }

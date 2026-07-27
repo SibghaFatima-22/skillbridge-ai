@@ -358,6 +358,68 @@ Return strictly valid JSON with this exact schema:
   }
 });
 
+// 1b. Dynamic Role Skills Generator AI
+app.post("/api/assessment/skills", async (req, res) => {
+  try {
+    const { targetRole } = req.body;
+    const role = targetRole || "Software Engineer";
+
+    const prompt = `You are a Technical Recruiter & Engineering Director. Generate a list of core technical skills for a diagnostic assessment for someone targeting the role: "${role}".
+Return strictly valid JSON:
+{
+  "programmingSkills": [{"name": "string", "category": "Language", "rating": 0}],
+  "frameworks": [{"name": "string", "category": "Framework", "rating": 0}],
+  "databases": [{"name": "string", "category": "Database/Storage", "rating": 0}],
+  "tools": [{"name": "string", "category": "Tool/DevOps", "rating": 0}]
+}`;
+
+    const skillsSchema = {
+      type: "object",
+      properties: {
+        programmingSkills: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { name: { type: "string" }, category: { type: "string" }, rating: { type: "number" } },
+            required: ["name", "category", "rating"]
+          }
+        },
+        frameworks: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { name: { type: "string" }, category: { type: "string" }, rating: { type: "number" } },
+            required: ["name", "category", "rating"]
+          }
+        },
+        databases: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { name: { type: "string" }, category: { type: "string" }, rating: { type: "number" } },
+            required: ["name", "category", "rating"]
+          }
+        },
+        tools: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { name: { type: "string" }, category: { type: "string" }, rating: { type: "number" } },
+            required: ["name", "category", "rating"]
+          }
+        }
+      },
+      required: ["programmingSkills", "frameworks", "databases", "tools"]
+    };
+
+    const data = await generateAIContentWithFallback(prompt, skillsSchema);
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error("Skills Gen Error:", error);
+    res.status(500).json({ success: false, error: "Failed to generate dynamic skills" });
+  }
+});
+
 // 2. Roadmap Generator AI
 app.post("/api/roadmap/generate", async (req, res) => {
   try {
@@ -711,94 +773,165 @@ JSON Structure:
 function generateFallbackQuestions(targetRole: string, interviewType: string, count: number) {
   const roleLower = targetRole.toLowerCase();
 
-  const catalog = [
-    {
-      id: "q1",
-      question: `Can you explain the difference between processes and threads, and how multi-threading is handled in ${roleLower.includes("python") ? "Python (GIL)" : roleLower.includes("java") ? "Java" : "Node.js / JavaScript"}?`,
-      category: "Technical",
-      hint: "Focus on memory sharing, execution context, and event loop / thread pool mechanics.",
-      keyPointsToCover: ["Memory space separation", "Thread scheduling & synchronization", "Concurrency vs parallelism"]
-    },
-    {
-      id: "q2",
-      question: `How do you optimize slow database queries in PostgreSQL/MySQL when working with tables containing millions of records?`,
-      category: "Technical",
-      hint: "Mention query execution plans (EXPLAIN ANALYZE), index types, and schema design.",
-      keyPointsToCover: ["B-tree vs Hash indexes", "Avoiding full table scans", "Connection pooling & partitioning"]
-    },
-    {
-      id: "q3",
-      question: "Describe a situation where you encountered a critical production bug or performance bottleneck. How did you diagnose and resolve it?",
-      category: "Behavioral",
-      hint: "Use the STAR method: Situation, Task, Action, and quantifiable Result.",
-      keyPointsToCover: ["Structured debugging approach", "Root cause analysis", "Metrics or monitoring tools used"]
-    },
-    {
-      id: "q4",
-      question: "How would you design a rate limiter service to prevent API abuse in a high-throughput microservices architecture?",
-      category: "System Design",
-      hint: "Discuss algorithms like Token Bucket or Leaky Bucket and Redis sliding windows.",
-      keyPointsToCover: ["Token bucket / Sliding window counter", "Redis atomic operations", "Handling distributed clock skew"]
-    },
-    {
-      id: "q5",
-      question: "Explain REST vs GraphQL vs gRPC. Under what circumstances would you choose each for client-server communication?",
-      category: "Architecture",
-      hint: "Compare payload size, over-fetching, type safety, and HTTP/2 multiplexing.",
-      keyPointsToCover: ["REST for standard HTTP CRUD", "GraphQL to prevent over/under-fetching", "gRPC / Protobuf for low-latency internal microservices"]
-    },
-    {
-      id: "q6",
-      question: "What is your approach to automated unit testing and integration testing? What metrics or coverage targets do you aim for?",
-      category: "Technical",
-      hint: "Explain test pyramid, mocking external dependencies, and CI/CD integration.",
-      keyPointsToCover: ["Unit vs Integration vs E2E test ratio", "Mocking third-party APIs", "CI pipeline enforcement"]
-    },
-    {
-      id: "q7",
-      question: "Tell me about a time you had a technical disagreement with a team member or senior developer. How did you reach a consensus?",
-      category: "Behavioral",
-      hint: "Highlight active listening, data-driven benchmarking, and commitment to project goals.",
-      keyPointsToCover: ["Objective benchmarking", "Professional empathy", "Unifying around business requirements"]
-    },
-    {
-      id: "q8",
-      question: "How do you secure web applications against OWASP Top 10 vulnerabilities like SQL Injection, XSS, and CSRF?",
-      category: "Technical",
-      hint: "Discuss parameterized queries, Content Security Policy headers, and token authentication.",
-      keyPointsToCover: ["Parameterized SQL / ORMs", "Sanitizing DOM inputs & HttpOnly cookies", "CORS policy and rate limiting"]
-    },
-    {
-      id: "q9",
-      question: "Explain the CAP theorem in distributed database systems. Give real-world examples of CP and AP databases.",
-      category: "System Design",
-      hint: "Consistency vs Availability vs Partition Tolerance under network partitions.",
-      keyPointsToCover: ["Trade-offs during network splits", "CP examples (Postgres/MongoDB)", "AP examples (Cassandra/DynamoDB)"]
-    },
-    {
-      id: "q10",
-      question: "How do you manage asynchronous state or caching (e.g. Redis) to ensure cache consistency with your primary database?",
-      category: "Architecture",
-      hint: "Mention Cache-Aside pattern, Cache Invalidation strategies, and TTL expiration.",
-      keyPointsToCover: ["Cache-Aside (Lazy loading)", "Write-through / Write-behind", "Cache stampede mitigation"]
-    },
-    {
-      id: "q11",
-      question: "Describe a challenging project where you had to learn a completely new framework or technology under a tight deadline.",
-      category: "Behavioral",
-      hint: "Demonstrate adaptability, rapid documentation reading, and prioritizing core MVP features.",
-      keyPointsToCover: ["Fast learning strategy", "Building minimal proof-of-concept", "Delivering on deadline"]
-    },
-    {
-      id: "q12",
-      question: "How do Docker containerization and Kubernetes orchestration simplify deployment, scaling, and environment consistency?",
-      category: "Technical",
-      hint: "Explain immutable infrastructure, container layers, zero-downtime rolling updates, and autoscaling.",
-      keyPointsToCover: ["Environment parity across Dev/Prod", "Horizontal Pod Autoscaling", "Container isolation"]
-    }
-  ];
+  let roleCatalog = [];
 
-  return catalog.slice(0, count);
+  if (roleLower.includes("frontend") || roleLower.includes("ui") || roleLower.includes("web developer")) {
+    roleCatalog = [
+      {
+        id: "q1",
+        question: `How does the Virtual DOM reconciliation algorithm work in modern React, and how do key props prevent unnecessary DOM re-renders?`,
+        category: "Technical",
+        hint: "Explain fiber reconciliation tree, diffing algorithm complexity (O(N)), and component batching.",
+        keyPointsToCover: ["Virtual DOM diffing", "Keys for list identity", "React 18 Concurrent Rendering & Automatic Batching"]
+      },
+      {
+        id: "q2",
+        question: `What strategies do you use to optimize Web Vitals (LCP, CLS, FID/INP) and decrease JavaScript bundle sizes in a production frontend app?`,
+        category: "Technical",
+        hint: "Discuss code splitting, dynamic imports (React.lazy), tree shaking, image lazy loading, and critical CSS.",
+        keyPointsToCover: ["Code splitting & Dynamic imports", "Optimizing Largest Contentful Paint (LCP)", "Minimizing Cumulative Layout Shift (CLS)"]
+      },
+      {
+        id: "q3",
+        question: `Describe how you structure global state management (e.g. Redux Toolkit, Zustand, React Context). How do you avoid re-rendering entire component trees?`,
+        category: "Architecture",
+        hint: "Discuss state normalization, selector memoization (useMemo, createSelector), and contextual splitting.",
+        keyPointsToCover: ["State normalization", "Selector memoization", "Context API vs Redux/Zustand trade-offs"]
+      },
+      {
+        id: "q4",
+        question: `Tell me about a time you resolved a complex CSS layout or cross-browser compatibility issue. How did you test and verify your fix?`,
+        category: "Behavioral",
+        hint: "Use STAR method: detail CSS Grid/Flexbox quirks, browser devtools profiling, and mobile responsiveness.",
+        keyPointsToCover: ["CSS Grid & Flexbox alignment", "DevTools rendering performance", "Cross-browser verification"]
+      },
+      {
+        id: "q5",
+        question: `Explain how Next.js or SSR/SSG differs from traditional Client-Side Rendering (CSR). When would you choose Server Components vs Client Components?`,
+        category: "Architecture",
+        hint: "Compare SEO hydration, server-side data fetching (getServerSideProps/RSC), and initial page load speed.",
+        keyPointsToCover: ["Server Components vs Client Components", "Hydration process", "SEO and LCP performance benefits"]
+      }
+    ];
+  } else if (roleLower.includes("ai") || roleLower.includes("ml") || roleLower.includes("data science") || roleLower.includes("machine learning")) {
+    roleCatalog = [
+      {
+        id: "q1",
+        question: `Explain the architecture of a Retrieval-Augmentation Generation (RAG) system. How do chunking strategies and embedding models impact retrieval accuracy?`,
+        category: "Technical",
+        hint: "Discuss document parsing, embedding distance metrics (Cosine Similarity), vector DB indexing (HNSW), and LLM prompting.",
+        keyPointsToCover: ["Chunk size & overlap strategy", "Embedding space & Vector search", "LLM context window assembly"]
+      },
+      {
+        id: "q2",
+        question: `What is the difference between Fine-Tuning an LLM (LoRA/QLoRA) vs Prompt Engineering vs RAG? When would you choose each for a product feature?`,
+        category: "Architecture",
+        hint: "Compare domain adaptation cost, parameter updates, hallucination reduction, and latency trade-offs.",
+        keyPointsToCover: ["LoRA / PEFT parameter efficient tuning", "RAG for real-time dynamic knowledge", "Cost and latency tradeoffs"]
+      },
+      {
+        id: "q3",
+        question: `How do you evaluate Machine Learning or LLM outputs when ground truth labels are soft or subjective? What metrics do you track?`,
+        category: "Technical",
+        hint: "Discuss ROUGE/BLEU scores, LLM-as-a-judge evaluation frameworks, Precision/Recall, and human feedback (RLHF).",
+        keyPointsToCover: ["LLM-as-a-judge metrics", "Precision, Recall, F1 score", "Human evaluation & RLHF principles"]
+      },
+      {
+        id: "q4",
+        question: `Describe a scenario where your machine learning model exhibited data drift or overfitting in production. How did you detect and fix it?`,
+        category: "Behavioral",
+        hint: "Detail monitoring pipelines (Evidently AI), retraining triggers, regularization (L1/L2), and feature store validation.",
+        keyPointsToCover: ["Data & concept drift detection", "Regularization and dropout", "Automated retraining pipeline"]
+      },
+      {
+        id: "q5",
+        question: `How do Vector Databases (e.g. Pinecone, Qdrant, Pgvector) index high-dimensional embeddings for sub-second similarity search?`,
+        category: "System Design",
+        hint: "Explain Hierarchical Navigable Small World (HNSW) graphs, IVF indexing, and approximate nearest neighbor (ANN) search.",
+        keyPointsToCover: ["ANN (Approximate Nearest Neighbor)", "HNSW index structure", "Vector memory management"]
+      }
+    ];
+  } else if (roleLower.includes("devops") || roleLower.includes("cloud") || roleLower.includes("infrastructure")) {
+    roleCatalog = [
+      {
+        id: "q1",
+        question: `How do you write secure, multi-stage Dockerfiles to minimize container image sizes and remove security vulnerabilities?`,
+        category: "Technical",
+        hint: "Discuss Alpine/distroless base images, non-root user permissions, layer caching, and build secrets handling.",
+        keyPointsToCover: ["Multi-stage build targets", "Layer caching optimization", "Non-root user execution & CVE scanning"]
+      },
+      {
+        id: "q2",
+        question: `Explain Kubernetes Ingress, Pod Autoscaling (HPA), and zero-downtime Deployment strategies (Canary vs Blue/Green).`,
+        category: "System Design",
+        hint: "Detail metrics-server scaling triggers, Ingress controllers (Nginx/Traefik), and readiness/liveness probes.",
+        keyPointsToCover: ["HPA CPU/Memory metrics", "Readiness & Liveness probes", "Canary vs Blue/Green deployments"]
+      },
+      {
+        id: "q3",
+        question: `How do you manage Infrastructure as Code (IaC) using Terraform? How do you maintain state locking and secret management in CI/CD?`,
+        category: "Architecture",
+        hint: "Discuss S3/DynamoDB remote state locking, modular Terraform design, and Vault secret injection.",
+        keyPointsToCover: ["Remote state locking with DynamoDB", "Modular terraform code", "Secret management integration"]
+      },
+      {
+        id: "q4",
+        question: `Describe a production incident where a build or deployment pipeline failed. How did you roll back and implement post-mortem preventions?`,
+        category: "Behavioral",
+        hint: "Use STAR method: automated rollback triggers, GitOps state restoration, and post-mortem SLA.",
+        keyPointsToCover: ["Automated rollback mechanisms", "GitOps deployment state", "Blameless post-mortem analysis"]
+      }
+    ];
+  } else {
+    // Standard Backend / Fullstack / General CS Catalog
+    roleCatalog = [
+      {
+        id: "q1",
+        question: `Can you explain the difference between processes and threads, and how asynchronous non-blocking execution works in ${roleLower.includes("python") ? "Python" : "Node.js / Go"}?`,
+        category: "Technical",
+        hint: "Focus on memory space, event loop queues, threadpool mechanics, and non-blocking I/O.",
+        keyPointsToCover: ["Memory space separation", "Event loop phases & microtask queues", "Concurrency vs parallelism"]
+      },
+      {
+        id: "q2",
+        question: `How do you optimize slow database queries in PostgreSQL/MySQL when working with tables containing millions of records?`,
+        category: "Technical",
+        hint: "Mention query execution plans (EXPLAIN ANALYZE), B-Tree & GIN index types, and schema design.",
+        keyPointsToCover: ["B-tree vs Hash indexes", "Avoiding full table scans", "Connection pooling & partitioning"]
+      },
+      {
+        id: "q3",
+        question: "Describe a situation where you encountered a critical production bug or performance bottleneck. How did you diagnose and resolve it?",
+        category: "Behavioral",
+        hint: "Use the STAR method: Situation, Task, Action, and quantifiable Result.",
+        keyPointsToCover: ["Structured debugging approach", "Root cause analysis", "Metrics or monitoring tools used"]
+      },
+      {
+        id: "q4",
+        question: "How would you design a rate limiter service to prevent API abuse in a high-throughput microservices architecture?",
+        category: "System Design",
+        hint: "Discuss algorithms like Token Bucket or Leaky Bucket and Redis sliding window counters.",
+        keyPointsToCover: ["Token bucket / Sliding window counter", "Redis atomic operations", "Handling distributed clock skew"]
+      },
+      {
+        id: "q5",
+        question: "Explain REST vs GraphQL vs gRPC. Under what circumstances would you choose each for client-server communication?",
+        category: "Architecture",
+        hint: "Compare payload size, over-fetching, type safety, and HTTP/2 multiplexing.",
+        keyPointsToCover: ["REST for standard HTTP CRUD", "GraphQL to prevent over/under-fetching", "gRPC / Protobuf for low-latency internal microservices"]
+      }
+    ];
+  }
+
+  // Multiply or slice to match count
+  let result = [];
+  while (result.length < count) {
+    result = [...result, ...roleCatalog];
+  }
+  return result.slice(0, count).map((q, idx) => ({
+    ...q,
+    id: `q_${idx + 1}`
+  }));
 }
 
 app.post("/api/interview/evaluate", async (req, res) => {
@@ -1569,104 +1702,104 @@ function generateFallbackGitHubAnalysis(cleanUser: string, userDetails: any, rep
 
   const projectRatings = repoSummaries.length > 0
     ? repoSummaries.map((r, idx) => {
-        let baseScore = 72;
+      let baseScore = 72;
 
-        // 1. Description completeness
-        if (r.description && r.description.length > 30) baseScore += 6;
-        else if (r.description && r.description.length > 10) baseScore += 3;
+      // 1. Description completeness
+      if (r.description && r.description.length > 30) baseScore += 6;
+      else if (r.description && r.description.length > 10) baseScore += 3;
 
-        // 2. Stars & Forks impact
-        baseScore += Math.min(12, (r.stars || 0) * 2 + (r.forks || 0) * 3);
+      // 2. Stars & Forks impact
+      baseScore += Math.min(12, (r.stars || 0) * 2 + (r.forks || 0) * 3);
 
-        // 3. Topics / Tagging
-        if (r.topics && r.topics.length > 0) baseScore += Math.min(8, r.topics.length * 2);
+      // 3. Topics / Tagging
+      if (r.topics && r.topics.length > 0) baseScore += Math.min(8, r.topics.length * 2);
 
-        // 4. Language relevance
-        const lang = (r.language || "").toLowerCase();
-        if (["typescript", "python", "go", "rust", "java", "c++", "kotlin"].includes(lang)) {
-          baseScore += 6;
-        } else if (["javascript", "c#", "php", "swift", "ruby"].includes(lang)) {
-          baseScore += 4;
-        } else {
-          baseScore += 2;
-        }
+      // 4. Language relevance
+      const lang = (r.language || "").toLowerCase();
+      if (["typescript", "python", "go", "rust", "java", "c++", "kotlin"].includes(lang)) {
+        baseScore += 6;
+      } else if (["javascript", "c#", "php", "swift", "ruby"].includes(lang)) {
+        baseScore += 4;
+      } else {
+        baseScore += 2;
+      }
 
-        // 5. Name complexity / keyword boost
-        const nameLower = (r.name || "").toLowerCase();
-        if (nameLower.includes("fullstack") || nameLower.includes("system") || nameLower.includes("engine") || nameLower.includes("api") || nameLower.includes("dashboard")) {
-          baseScore += 5;
-        } else if (nameLower.includes("demo") || nameLower.includes("test") || nameLower.includes("config") || nameLower.includes("dotfiles")) {
-          baseScore -= 4;
-        }
+      // 5. Name complexity / keyword boost
+      const nameLower = (r.name || "").toLowerCase();
+      if (nameLower.includes("fullstack") || nameLower.includes("system") || nameLower.includes("engine") || nameLower.includes("api") || nameLower.includes("dashboard")) {
+        baseScore += 5;
+      } else if (nameLower.includes("demo") || nameLower.includes("test") || nameLower.includes("config") || nameLower.includes("dotfiles")) {
+        baseScore -= 4;
+      }
 
-        // 6. Name character hash variation to ensure distinct score per repository
-        const nameHash = (r.name || "").split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-        const pseudoVariation = ((nameHash + idx * 7) % 13) - 6; // -6 to +6
+      // 6. Name character hash variation to ensure distinct score per repository
+      const nameHash = (r.name || "").split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+      const pseudoVariation = ((nameHash + idx * 7) % 13) - 6; // -6 to +6
 
-        const finalScore = Math.min(96, Math.max(64, baseScore + pseudoVariation));
+      const finalScore = Math.min(96, Math.max(64, baseScore + pseudoVariation));
 
-        const strengths = [];
-        if (r.stars > 0) strengths.push(`Community engagement with ${r.stars} star(s)`);
-        if (r.language) strengths.push(`Built using ${r.language} with clear project structure`);
-        if (r.topics && r.topics.length > 0) strengths.push(`Tagged with relevant topics: ${r.topics.slice(0, 3).join(", ")}`);
-        if (strengths.length < 2) strengths.push("Clean directory organization and modular file breakdown");
+      const strengths = [];
+      if (r.stars > 0) strengths.push(`Community engagement with ${r.stars} star(s)`);
+      if (r.language) strengths.push(`Built using ${r.language} with clear project structure`);
+      if (r.topics && r.topics.length > 0) strengths.push(`Tagged with relevant topics: ${r.topics.slice(0, 3).join(", ")}`);
+      if (strengths.length < 2) strengths.push("Clean directory organization and modular file breakdown");
 
-        const improvements = [];
-        if (!r.topics || r.topics.length === 0) improvements.push("Add GitHub topic tags (e.g. #react, #api) to increase discoverability");
-        if (!r.description || r.description.length < 20) improvements.push("Expand repository README and project summary description");
-        improvements.push("Include Docker container configuration and automated testing pipeline");
+      const improvements = [];
+      if (!r.topics || r.topics.length === 0) improvements.push("Add GitHub topic tags (e.g. #react, #api) to increase discoverability");
+      if (!r.description || r.description.length < 20) improvements.push("Expand repository README and project summary description");
+      improvements.push("Include Docker container configuration and automated testing pipeline");
 
-        return {
-          name: r.name,
-          description: r.description || `${r.name} open source codebase`,
-          language: r.language || "TypeScript",
-          stars: r.stars || 0,
-          forks: r.forks || 0,
-          score: finalScore,
-          htmlUrl: r.htmlUrl || `https://github.com/${cleanUser}/${r.name}`,
-          strengths: strengths.slice(0, 2),
-          improvements: improvements.slice(0, 2),
-          resumeBulletSuggestion: `Engineered '${r.name}' using ${r.language || 'modern stack'}, implementing scalable design patterns and clean component architecture.`
-        };
-      })
+      return {
+        name: r.name,
+        description: r.description || `${r.name} open source codebase`,
+        language: r.language || "TypeScript",
+        stars: r.stars || 0,
+        forks: r.forks || 0,
+        score: finalScore,
+        htmlUrl: r.htmlUrl || `https://github.com/${cleanUser}/${r.name}`,
+        strengths: strengths.slice(0, 2),
+        improvements: improvements.slice(0, 2),
+        resumeBulletSuggestion: `Engineered '${r.name}' using ${r.language || 'modern stack'}, implementing scalable design patterns and clean component architecture.`
+      };
+    })
     : [
-        {
-          name: `${cleanUser}-web-app`,
-          description: "Full stack web application built with React, TypeScript, and Node.js",
-          language: "TypeScript",
-          stars: 12,
-          forks: 4,
-          score: 91,
-          htmlUrl: `https://github.com/${cleanUser}/${cleanUser}-web-app`,
-          strengths: ["Modular component layout", "Clean TypeScript interfaces"],
-          improvements: ["Add automated test suite in CI/CD", "Include architecture diagram"],
-          resumeBulletSuggestion: `Engineered full-stack TypeScript web application with REST APIs, achieving high performance and clean code separation.`
-        },
-        {
-          name: "api-backend-service",
-          description: "Microservice backend with database integration and RESTful endpoints",
-          language: "JavaScript",
-          stars: 8,
-          forks: 2,
-          score: 84,
-          htmlUrl: `https://github.com/${cleanUser}/api-backend-service`,
-          strengths: ["Structured REST endpoint routing", "Async request handling"],
-          improvements: ["Add Dockerfile and environment variable validator", "Implement request rate limiting"],
-          resumeBulletSuggestion: "Designed scalable REST API service with Node.js & Express, processing JSON payloads with structured error handling."
-        },
-        {
-          name: "data-pipeline-utils",
-          description: "Data parsing utilities and ETL scripts",
-          language: "Python",
-          stars: 3,
-          forks: 1,
-          score: 76,
-          htmlUrl: `https://github.com/${cleanUser}/data-pipeline-utils`,
-          strengths: ["Efficient data batching", "Type-annotated Python functions"],
-          improvements: ["Add unit tests with pytest", "Create CLI user documentation"],
-          resumeBulletSuggestion: "Built automated Python data processing utilities, streamlining ETL workflow execution speed by 35%."
-        }
-      ];
+      {
+        name: `${cleanUser}-web-app`,
+        description: "Full stack web application built with React, TypeScript, and Node.js",
+        language: "TypeScript",
+        stars: 12,
+        forks: 4,
+        score: 91,
+        htmlUrl: `https://github.com/${cleanUser}/${cleanUser}-web-app`,
+        strengths: ["Modular component layout", "Clean TypeScript interfaces"],
+        improvements: ["Add automated test suite in CI/CD", "Include architecture diagram"],
+        resumeBulletSuggestion: `Engineered full-stack TypeScript web application with REST APIs, achieving high performance and clean code separation.`
+      },
+      {
+        name: "api-backend-service",
+        description: "Microservice backend with database integration and RESTful endpoints",
+        language: "JavaScript",
+        stars: 8,
+        forks: 2,
+        score: 84,
+        htmlUrl: `https://github.com/${cleanUser}/api-backend-service`,
+        strengths: ["Structured REST endpoint routing", "Async request handling"],
+        improvements: ["Add Dockerfile and environment variable validator", "Implement request rate limiting"],
+        resumeBulletSuggestion: "Designed scalable REST API service with Node.js & Express, processing JSON payloads with structured error handling."
+      },
+      {
+        name: "data-pipeline-utils",
+        description: "Data parsing utilities and ETL scripts",
+        language: "Python",
+        stars: 3,
+        forks: 1,
+        score: 76,
+        htmlUrl: `https://github.com/${cleanUser}/data-pipeline-utils`,
+        strengths: ["Efficient data batching", "Type-annotated Python functions"],
+        improvements: ["Add unit tests with pytest", "Create CLI user documentation"],
+        resumeBulletSuggestion: "Built automated Python data processing utilities, streamlining ETL workflow execution speed by 35%."
+      }
+    ];
 
   // Dynamic Score Calculations based on User Profile & Repo metrics
   const avgProjectScore = Math.round(
@@ -1898,7 +2031,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`SkillBridge AI Server running at http://0.0.0.0:${PORT}`);
+    console.log(`SkillBridge AI Server running at http://127.0.0.1:${PORT}`);
   });
 }
 

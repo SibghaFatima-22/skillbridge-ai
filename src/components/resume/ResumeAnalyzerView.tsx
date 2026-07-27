@@ -17,10 +17,8 @@ interface ResumeAnalyzerViewProps {
 }
 
 export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({ addNotification }) => {
-  const [resumeText, setResumeText] = useState(
-    "Ali Ahmed\nComputer Science Senior Student\nSkills: C++, JavaScript, Node.js, Express, PostgreSQL, Git\nProjects: E-commerce backend API using Express and PostgreSQL. Implemented JWT authentication and rate limiting."
-  );
-  const [targetJobTitle, setTargetJobTitle] = useState("Backend Engineer");
+  const [resumeText, setResumeText] = useState("");
+  const [targetJobTitle, setTargetJobTitle] = useState("Software Engineer");
   const [loading, setLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -66,7 +64,7 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({ addNotif
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Resume ATS Analyzer</h1>
           <p className="text-xs text-slate-400 mt-1">
-            Scan your resume against real job market algorithms to fix missing keywords and formatting flaws.
+            Scan your resume content with Gemini AI to identify missing keywords, ATS score, and optimization tips.
           </p>
         </div>
       </div>
@@ -82,119 +80,104 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({ addNotif
               type="text"
               value={targetJobTitle}
               onChange={(e) => setTargetJobTitle(e.target.value)}
-              placeholder="e.g. Backend Developer, Frontend Engineer, AI Specialist"
+              placeholder="e.g. Backend Developer, Frontend Engineer, AI Engineer"
               className="w-full px-4 py-2.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500"
             />
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-              Paste Resume Content / Text
+              Paste Your Resume Content / Plain Text
             </label>
             <textarea
               rows={12}
               value={resumeText}
               onChange={(e) => setResumeText(e.target.value)}
-              placeholder="Paste your complete resume text here..."
+              placeholder="Paste your complete resume text here (education, experience, projects, technical skills)..."
               className="w-full p-4 text-xs font-mono rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 leading-relaxed"
             />
           </div>
 
           {errorMsg && (
-            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
           <button
             onClick={handleAnalyze}
-            disabled={loading}
-            className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2"
+            disabled={!resumeText.trim() || loading}
+            className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-bold shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            <span>Analyze Resume with AI</span>
+            <span>Run Gemini ATS Resume Analysis</span>
           </button>
         </div>
 
         {/* Results Column */}
-        {analysisResult ? (
-          <div className="space-y-6">
-            {/* Score Ring Card */}
-            <div className="p-6 rounded-3xl bg-slate-900 text-white border border-slate-800 space-y-4 shadow-xl">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Overall ATS Match Score</span>
-                <span className="text-xs font-extrabold text-emerald-400 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                  Ready to Apply
-                </span>
+        <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm">
+          {!analysisResult ? (
+            <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center p-6 space-y-3">
+              <div className="p-4 rounded-2xl bg-blue-500/10 text-blue-500">
+                <FileSearch className="w-8 h-8" />
               </div>
-
-              <div className="flex items-center gap-6">
-                <div className="text-5xl font-black text-blue-400">{analysisResult.atsScore ?? "--"}%</div>
-                <p className="text-xs text-slate-300 leading-relaxed">{analysisResult.summary || "Analysis complete."}</p>
-              </div>
-
-              {/* Breakdown Grid */}
-              <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-800 text-center">
-                <div className="p-2.5 rounded-xl bg-slate-800/60">
-                  <div className="text-[10px] text-slate-400 font-medium">Keywords</div>
-                  <div className="text-base font-bold text-white mt-0.5">{analysisResult.keywordScore ?? "--"}%</div>
+              <h3 className="font-bold text-slate-900 dark:text-white text-base">Awaiting Resume Content</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs">
+                Paste your resume text on the left and click 'Run Gemini ATS Resume Analysis' to see keyword density and ATS scores.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-6 animate-in fade-in">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-white">ATS Analysis Overview</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Target Role: {targetJobTitle}</p>
                 </div>
-                <div className="p-2.5 rounded-xl bg-slate-800/60">
-                  <div className="text-[10px] text-slate-400 font-medium">Grammar</div>
-                  <div className="text-base font-bold text-white mt-0.5">{analysisResult.grammarScore ?? "--"}%</div>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-800/60">
-                  <div className="text-[10px] text-slate-400 font-medium">Format</div>
-                  <div className="text-base font-bold text-white mt-0.5">{analysisResult.formattingScore ?? "--"}%</div>
+                <div className="text-right">
+                  <div className="text-2xl font-black text-emerald-500">{analysisResult.atsScore}%</div>
+                  <div className="text-[10px] text-slate-400 font-bold">ATS Score</div>
                 </div>
               </div>
-            </div>
 
-            {/* Missing Keywords Box */}
-            <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 shadow-sm">
-              <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-500" /> Missing ATS Keywords for {targetJobTitle}
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {(analysisResult.missingKeywords || []).map((kw: string, i: number) => (
-                  <span key={i} className="px-3 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40 text-xs font-semibold">
-                    + {kw}
-                  </span>
-                ))}
-                {(!analysisResult.missingKeywords || analysisResult.missingKeywords.length === 0) && (
-                  <span className="text-xs text-slate-400 italic">No missing keywords detected.</span>
-                )}
-              </div>
-            </div>
+              {analysisResult.summary && (
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-700 dark:text-slate-300 leading-relaxed border border-slate-200 dark:border-slate-700">
+                  💡 <strong>Summary:</strong> {analysisResult.summary}
+                </div>
+              )}
 
-            {/* Recommended Improvements */}
-            <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 shadow-sm">
-              <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Actionable Improvements
-              </h3>
-              <ul className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
-                {(analysisResult.improvements || []).map((imp: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="text-emerald-500 font-bold">•</span>
-                    <span>{imp}</span>
-                  </li>
-                ))}
-                {(!analysisResult.improvements || analysisResult.improvements.length === 0) && (
-                  <li className="text-slate-400 italic">No specific improvements flagged.</li>
-                )}
-              </ul>
+              {analysisResult.missingKeywords && analysisResult.missingKeywords.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-bold text-xs text-slate-900 dark:text-white">Missing Keywords for {targetJobTitle}:</h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {analysisResult.missingKeywords.map((kw: string, i: number) => (
+                      <span
+                        key={i}
+                        className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                      >
+                        + {kw}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {analysisResult.improvements && analysisResult.improvements.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-bold text-xs text-slate-900 dark:text-white">Actionable Recommendations:</h4>
+                  <ul className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400">
+                    {analysisResult.improvements.map((tip: string, i: number) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                        <span>{tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
-          </div>
-        ) : (
-          <div className="p-12 rounded-3xl bg-slate-50 dark:bg-slate-900/40 border border-dashed border-slate-300 dark:border-slate-800 text-center flex flex-col items-center justify-center text-slate-400 space-y-3">
-            <FileSearch className="w-10 h-10 text-slate-400" />
-            <div className="text-sm font-bold text-slate-700 dark:text-slate-300">No Resume Analysis Executed Yet</div>
-            <p className="text-xs max-w-xs leading-relaxed">
-              Paste your resume text on the left and click "Analyze Resume with AI" to generate real-time ATS feedback.
-            </p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

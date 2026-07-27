@@ -1,4 +1,40 @@
-// SkillBridge AI - API Client Helpers
+export async function generateRoleSkillsAPI(targetRole: string) {
+  try {
+    const res = await fetch("/api/assessment/skills", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetRole }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || "Failed to generate skills");
+    return data.data;
+  } catch (err: any) {
+    // Dynamic fallbacks based on target role keywords
+    const lower = targetRole.toLowerCase();
+    if (lower.includes("frontend")) {
+      return {
+        programmingSkills: [{ name: "JavaScript (ES6+)", category: "Language", rating: 0 }, { name: "TypeScript", category: "Language", rating: 0 }, { name: "HTML5 & CSS3", category: "Markup", rating: 0 }],
+        frameworks: [{ name: "React", category: "Frontend", rating: 0 }, { name: "Next.js App Router", category: "Fullstack", rating: 0 }, { name: "Tailwind CSS", category: "Styling", rating: 0 }],
+        databases: [{ name: "REST API Integration", category: "Data", rating: 0 }, { name: "GraphQL & TanStack Query", category: "State", rating: 0 }],
+        tools: [{ name: "Git & GitHub", category: "DevTools", rating: 0 }, { name: "Vercel / Cloudflare", category: "Hosting", rating: 0 }, { name: "Chrome DevTools & Lighthouse", category: "Profiling", rating: 0 }],
+      };
+    }
+    if (lower.includes("ai") || lower.includes("ml") || lower.includes("data")) {
+      return {
+        programmingSkills: [{ name: "Python 3", category: "Language", rating: 0 }, { name: "SQL", category: "Language", rating: 0 }, { name: "C++", category: "Compute", rating: 0 }],
+        frameworks: [{ name: "PyTorch / TensorFlow", category: "Deep Learning", rating: 0 }, { name: "LangChain / LlamaIndex", category: "Generative AI", rating: 0 }, { name: "Pandas & NumPy", category: "Data Analysis", rating: 0 }],
+        databases: [{ name: "Vector DBs (Pinecone/pgvector)", category: "Embeddings", rating: 0 }, { name: "PostgreSQL", category: "Relational", rating: 0 }],
+        tools: [{ name: "Jupyter / Colab", category: "Environment", rating: 0 }, { name: "Hugging Face Transformers", category: "Model Hub", rating: 0 }, { name: "Docker & CUDA", category: "Deployment", rating: 0 }],
+      };
+    }
+    return {
+      programmingSkills: [{ name: "TypeScript / JavaScript", category: "Language", rating: 0 }, { name: "Python / Go / Java", category: "Backend Language", rating: 0 }, { name: "SQL", category: "Database Language", rating: 0 }],
+      frameworks: [{ name: "Node.js & Express / NestJS", category: "Backend Framework", rating: 0 }, { name: "React / Next.js", category: "Frontend Framework", rating: 0 }, { name: "FastAPI / Django", category: "Python Backend", rating: 0 }],
+      databases: [{ name: "PostgreSQL", category: "Relational DB", rating: 0 }, { name: "MongoDB", category: "NoSQL DB", rating: 0 }, { name: "Redis", category: "Caching Layer", rating: 0 }],
+      tools: [{ name: "Git & GitHub", category: "Version Control", rating: 0 }, { name: "Docker & Containers", category: "DevOps", rating: 0 }, { name: "Postman & REST Specs", category: "Testing", rating: 0 }, { name: "Linux CLI & Bash", category: "SysAdmin", rating: 0 }],
+    };
+  }
+}
 
 export async function analyzeAssessmentAPI(payload: any) {
   try {

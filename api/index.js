@@ -1679,7 +1679,7 @@ async function startServer() {
     });
   }
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`SkillBridge AI Server running at http://0.0.0.0:${PORT}`);
+    console.log(`SkillBridge AI Server running at http://127.0.0.1:${PORT}`);
   });
 }
 if (!process.env.VERCEL) {

@@ -1,4 +1,4 @@
-// SkillBridge AI - Global TypeScript Types
+// SkillBridge AI - Global TypeScript Types (Clean MVP)
 
 export type TargetCareerRole =
   | "Frontend Developer"
@@ -36,10 +36,6 @@ export interface UserProfile {
   roadmapProgress: number; // 0-100
   resumeScore: number; // 0-100
   interviewScore: number; // 0-100
-  jobMatchScore: number; // 0-100
-  xp: number;
-  level: number;
-  currentStreak: number;
   plan: "Free" | "Pro" | "Career+";
   theme: "light" | "dark" | "system";
   createdAt: string;
@@ -118,15 +114,15 @@ export interface RoadmapData {
   career: TargetCareerRole;
   estimatedMonths: number;
   estimatedWeeks: number;
-  difficulty: string;
+  difficulty: "Beginner" | "Intermediate" | "Advanced";
   summary: string;
-  progress: number; // 0-100
-  milestones: RoadmapMilestone[];
-  capstoneProject: {
+  progress: number;
+  capstoneProject?: {
     title: string;
     description: string;
     deliverables: string[];
   };
+  milestones: RoadmapMilestone[];
   createdAt: string;
 }
 
@@ -146,30 +142,10 @@ export interface ResourceItem {
   bookmarked?: boolean;
 }
 
-export interface ResumeSectionExperience {
-  id: string;
-  company: string;
-  role: string;
-  location: string;
-  startDate: string;
-  endDate: string;
-  current: boolean;
-  bullets: string[];
-}
-
-export interface ResumeSectionProject {
-  id: string;
-  title: string;
-  role: string;
-  technologies: string[];
-  link: string;
-  bullets: string[];
-}
-
 export interface ResumeData {
   id: string;
   userId: string;
-  template: "Modern" | "ATS Executive" | "Developer Minimal" | "Creative Tech";
+  template: string;
   personalInfo: {
     fullName: string;
     email: string;
@@ -188,9 +164,26 @@ export interface ResumeData {
     startDate: string;
     endDate: string;
     gpa: string;
+    bullets?: string[];
   }[];
-  experience: ResumeSectionExperience[];
-  projects: ResumeSectionProject[];
+  experience: {
+    id: string;
+    company: string;
+    role: string;
+    location: string;
+    startDate: string;
+    endDate: string;
+    current: boolean;
+    bullets: string[];
+  }[];
+  projects: {
+    id: string;
+    title: string;
+    role: string;
+    technologies: string[];
+    link: string;
+    bullets: string[];
+  }[];
   skills: {
     languages: string[];
     frameworks: string[];
@@ -219,79 +212,12 @@ export interface ResumeAnalysisResult {
   createdAt: string;
 }
 
-export interface InterviewQuestion {
-  id: string;
-  question: string;
-  category: "Behavioral" | "Technical" | "System Design" | "Coding" | "HR";
-  hint: string;
-  idealAnswerKeyPoints: string[];
-  suggestedTimeMinutes: number;
-  userAnswer?: string;
-  evaluation?: {
-    score: number;
-    communicationScore: number;
-    technicalAccuracyScore: number;
-    confidenceScore: number;
-    problemSolvingScore: number;
-    feedback: string;
-    missingKeyPoints: string[];
-    modelAnswer: string;
-    hiringRecommendation: string;
-  };
-}
-
-export interface InterviewSession {
-  id: string;
-  userId: string;
-  targetRole: TargetCareerRole;
-  interviewType: "Behavioral" | "Technical" | "Full Stack" | "System Design" | "HR" | "DSA";
-  difficulty: "Beginner" | "Intermediate" | "Advanced";
-  questions: InterviewQuestion[];
-  overallScore?: number;
-  completed: boolean;
-  createdAt: string;
-}
-
-export interface JobMatch {
-  id: string;
-  jobTitle: string;
-  company: string;
-  location: string;
-  salary: string;
-  matchPercentage: number;
-  requiredSkills: string[];
-  matchingSkills: string[];
-  missingSkills: string[];
-  applicationTip: string;
-  postedDate: string;
-  type: string;
-  saved?: boolean;
-  bookmarked?: boolean;
-  applyUrl?: string;
-}
-
 export interface MentorMessage {
   id: string;
   role: "user" | "assistant";
   text: string;
   suggestedFollowUps?: string[];
-  keyTakeaway?: string;
   timestamp: string;
-}
-
-export interface GithubAnalysis {
-  id: string;
-  username: string;
-  developerScore: number;
-  portfolioScore: number;
-  codeQualityScore: number;
-  documentationScore: number;
-  topLanguages: string[];
-  strengths: string[];
-  weaknesses: string[];
-  recommendations: string[];
-  overallVerdict: string;
-  createdAt: string;
 }
 
 export interface GitHubAnalysisResult {
@@ -336,6 +262,17 @@ export interface GitHubAnalysisResult {
   }[];
 }
 
+export interface InterviewSession {
+  id: string;
+  userId: string;
+  role: string;
+  interviewType: string;
+  difficulty: string;
+  overallScore?: number;
+  completed: boolean;
+  createdAt: string;
+}
+
 export interface NotificationItem {
   id: string;
   title: string;
@@ -343,25 +280,4 @@ export interface NotificationItem {
   type: "info" | "success" | "warning" | "achievement";
   read: boolean;
   createdAt: string;
-}
-
-export interface AchievementItem {
-  id: string;
-  title: string;
-  description: string;
-  iconName: string;
-  icon?: string;
-  xp: number;
-  unlocked: boolean;
-  unlockedAt?: string;
-}
-
-export type AchievementBadge = AchievementItem;
-
-export interface DashboardInsights {
-  dailyTip: string;
-  motivationQuote: string;
-  recommendedAction: string;
-  careerReadinessDelta: string;
-  focusArea: string;
 }

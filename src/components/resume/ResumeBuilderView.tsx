@@ -1,26 +1,6 @@
 import React, { useState } from "react";
 import {
-  FileText,
-  Sparkles,
-  Download,
-  Plus,
-  Trash2,
-  Wand2,
-  CheckCircle2,
-  Eye,
-  Edit3,
-  Loader2,
-  Printer,
-  Globe,
-  Github,
-  Linkedin,
-  Mail,
-  Phone,
-  MapPin,
-  Building,
-  GraduationCap,
-  Award,
-  Code2,
+  FileText, Download, Edit3, Eye, Printer, Wand2, Sparkles, Loader2, Plus, Trash2
 } from "lucide-react";
 import { ResumeData } from "../../types";
 import { enhanceResumeAPI } from "../../lib/api";
@@ -29,15 +9,48 @@ import { exportElementToPdf } from "../../lib/pdfExport";
 interface ResumeBuilderViewProps {
   resume: ResumeData;
   setResume: (res: ResumeData) => void;
+  user?: {
+    fullName?: string;
+    email?: string;
+    university?: string;
+    githubUrl?: string;
+    linkedinUrl?: string;
+    targetCareer?: string;
+  };
 }
 
 export const ResumeBuilderView: React.FC<ResumeBuilderViewProps> = ({
   resume,
   setResume,
+  user,
 }) => {
-  const [activeTab, setActiveTab] = useState<"edit" | "preview">("preview");
+  const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
   const [enhancingIndex, setEnhancingIndex] = useState<number | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  // Pre-fill personal info from user profile if fields are empty
+  const prefillPersonalInfo = () => {
+    if (!user) return;
+    const updated = {
+      ...resume,
+      personalInfo: {
+        ...resume.personalInfo,
+        fullName: resume.personalInfo.fullName || user.fullName || "",
+        email: resume.personalInfo.email || user.email || "",
+        location: resume.personalInfo.location || user.university || "",
+        github: resume.personalInfo.github || user.githubUrl || "",
+        linkedin: resume.personalInfo.linkedin || user.linkedinUrl || "",
+      },
+    };
+    setResume(updated);
+  };
+
+  // Auto-prefill on first render if personal info is empty
+  React.useEffect(() => {
+    if (user && !resume.personalInfo.fullName && user.fullName) {
+      prefillPersonalInfo();
+    }
+  }, []);
 
   // Form helpers
   const handlePersonalInfoChange = (field: string, value: string) => {
@@ -52,7 +65,7 @@ export const ResumeBuilderView: React.FC<ResumeBuilderViewProps> = ({
     const result = await enhanceResumeAPI({
       section: "Professional Summary",
       rawText: resume.summary,
-      targetRole: "Software Engineer",
+      targetRole: user?.targetCareer || "Software Engineer",
     });
     if (result?.enhancedText) {
       setResume({ ...resume, summary: result.enhancedText });
@@ -64,36 +77,25 @@ export const ResumeBuilderView: React.FC<ResumeBuilderViewProps> = ({
     setEnhancingIndex(expIdx * 10 + bulletIdx);
     const rawBullet = resume.experience[expIdx].bullets[bulletIdx];
     const result = await enhanceResumeAPI({
-      section: "Work Experience",
+      section: "Experience Bullet",
       rawText: rawBullet,
-      targetRole: "Software Engineer",
+      targetRole: user?.targetCareer || "Software Engineer",
     });
-
     if (result?.enhancedText) {
       const updatedExp = [...resume.experience];
-      updatedExp[expIdx].bullets[bulletIdx] = result.enhancedText.split("\n")[0].replace(/^•\s*/, "");
+      updatedExp[expIdx].bullets[bulletIdx] = result.enhancedText;
       setResume({ ...resume, experience: updatedExp });
     }
     setEnhancingIndex(null);
   };
 
-  // High quality client-side PDF export
   const handleExportPdf = async () => {
+    if (activeTab !== "preview") {
+      setActiveTab("preview");
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
     try {
       setIsExportingPdf(true);
-
-      // Look for print area element
-      let element = document.getElementById("resume-print-area");
-
-      // If not visible in DOM, temporarily switch to preview tab
-      if (!element) {
-        setActiveTab("preview");
-        await new Promise((r) => setTimeout(r, 400));
-        element = document.getElementById("resume-print-area");
-      }
-
-      if (!element) throw new Error("Resume element not found");
-
       const filename = `${(resume.personalInfo.fullName || "Candidate").trim().replace(/\s+/g, "_")}_Resume.pdf`;
 
       await exportElementToPdf({
@@ -138,7 +140,8 @@ ${(proj.bullets || []).map(b => `• ${b}`).join('\n')}
 EDUCATION
 -------------------------------------------------------
 ${(resume.education || []).map(edu => `
-${edu.institution} - ${edu.degree} in ${edu.field} (${edu.startDate} - ${edu.endDate})
+${edu.institution} - ${edu.degree} in ${edu.field} (${edu.startDate} - ${edu.endDate}) ${edu.gpa ? `[GPA: ${edu.gpa}]` : ''}
+${(edu.bullets || []).map(b => `• ${b}`).join('\n')}
 `).join('\n')}
 
 TECHNICAL SKILLS
@@ -257,13 +260,22 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-400 pb-1 mb-2 font-sans">
                 Education
               </h2>
-              <div className="space-y-1 font-sans text-xs">
+              <div className="space-y-2 font-sans text-xs">
                 {resume.education.map((edu) => (
-                  <div key={edu.id} className="flex justify-between text-slate-900">
-                    <div>
-                      <strong>{edu.institution}</strong> — {edu.degree} in {edu.field}
+                  <div key={edu.id} className="space-y-1">
+                    <div className="flex justify-between text-slate-900">
+                      <div>
+                        <strong>{edu.institution}</strong> — {edu.degree} in {edu.field} {edu.gpa ? `(GPA: ${edu.gpa})` : ""}
+                      </div>
+                      <div className="text-slate-600">{edu.startDate} – {edu.endDate}</div>
                     </div>
-                    <div className="text-slate-600">{edu.startDate} – {edu.endDate}</div>
+                    {edu.bullets && edu.bullets.length > 0 && (
+                      <ul className="list-disc pl-4 text-[11px] text-slate-700 space-y-0.5">
+                        {edu.bullets.map((b, i) => (
+                          <li key={i}>{b}</li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 ))}
               </div>
@@ -295,7 +307,7 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
           <div className="border-l-4 border-blue-600 pl-4 py-1 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h1 className="text-3xl font-black text-slate-900 tracking-tight">{resume.personalInfo.fullName}</h1>
-              <div className="text-xs text-blue-600 font-bold mt-1">Full Stack & Software Engineer</div>
+              <div className="text-xs text-blue-600 font-bold mt-1">{user?.targetCareer || "Software Engineer"}</div>
             </div>
             <div className="text-xs text-slate-600 space-y-1 text-right">
               <div>{resume.personalInfo.email} • {resume.personalInfo.phone}</div>
@@ -369,9 +381,16 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
                 Education
               </h2>
               {resume.education.map((edu) => (
-                <div key={edu.id} className="text-xs space-y-0.5">
+                <div key={edu.id} className="text-xs space-y-1 mb-2">
                   <div className="font-bold text-slate-900">{edu.institution}</div>
                   <div className="text-slate-600">{edu.degree} in {edu.field} ({edu.startDate} - {edu.endDate})</div>
+                  {edu.bullets && edu.bullets.length > 0 && (
+                    <ul className="list-disc pl-4 text-[11px] text-slate-600 space-y-0.5">
+                      {edu.bullets.map((b, i) => (
+                        <li key={i}>{b}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               ))}
             </div>
@@ -441,55 +460,24 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
             </div>
           )}
 
-          {/* Projects */}
-          {resume.projects && resume.projects.length > 0 && (
+          {/* Education */}
+          {resume.education && resume.education.length > 0 && (
             <div>
               <div className="font-bold text-slate-900 uppercase border-b border-slate-300 pb-0.5 mb-1.5">
-                // PROJECTS
+                // EDUCATION
               </div>
               <div className="space-y-2">
-                {resume.projects.map((proj) => (
-                  <div key={proj.id} className="space-y-1">
-                    <div className="flex justify-between font-bold text-slate-900">
-                      <span>&gt; {proj.title} [{proj.technologies.join(", ")}]</span>
-                      <span className="font-normal text-slate-500">{proj.link}</span>
-                    </div>
-                    <ul className="space-y-1 pl-3 text-slate-700 text-[11px]">
-                      {proj.bullets.map((b, i) => (
-                        <li key={i}>■ {b}</li>
-                      ))}
-                    </ul>
+                {resume.education.map((edu) => (
+                  <div key={edu.id} className="space-y-0.5">
+                    <div className="font-bold text-slate-900">&gt; {edu.institution} ({edu.degree} in {edu.field})</div>
+                    {edu.bullets && edu.bullets.map((b, i) => (
+                      <div key={i} className="pl-3 text-slate-600 text-[11px]">■ {b}</div>
+                    ))}
                   </div>
                 ))}
               </div>
             </div>
           )}
-
-          {/* Education & Skills */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="font-bold text-slate-900 uppercase border-b border-slate-300 pb-0.5 mb-1.5">
-                // EDUCATION
-              </div>
-              {resume.education.map((edu) => (
-                <div key={edu.id} className="text-[11px] text-slate-800">
-                  <div className="font-bold">{edu.institution}</div>
-                  <div>{edu.degree} in {edu.field} ({edu.startDate} - {edu.endDate})</div>
-                </div>
-              ))}
-            </div>
-
-            <div>
-              <div className="font-bold text-slate-900 uppercase border-b border-slate-300 pb-0.5 mb-1.5">
-                // SKILLS
-              </div>
-              <div className="text-[11px] text-slate-800">
-                <div>LANGS: {resume.skills.languages?.join(", ")}</div>
-                <div>FRAMEWORKS: {resume.skills.frameworks?.join(", ")}</div>
-                <div>TOOLS: {resume.skills.tools?.join(", ")}</div>
-              </div>
-            </div>
-          </div>
         </div>
       );
     }
@@ -501,7 +489,7 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
         <div className="p-6 rounded-2xl bg-slate-900 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-2xl font-black text-white tracking-wide">{resume.personalInfo.fullName}</h1>
-            <p className="text-xs text-emerald-400 font-semibold mt-0.5">Software Engineering Candidate</p>
+            <p className="text-xs text-emerald-400 font-semibold mt-0.5">{user?.targetCareer || "Software Engineering Candidate"}</p>
           </div>
           <div className="text-xs text-slate-300 space-y-1 text-right font-medium">
             <div>{resume.personalInfo.email} • {resume.personalInfo.phone}</div>
@@ -543,30 +531,6 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
           </div>
         )}
 
-        {/* Projects */}
-        {resume.projects && resume.projects.length > 0 && (
-          <div>
-            <div className="inline-block px-3 py-1 rounded-lg bg-slate-100 text-slate-900 text-xs font-black uppercase mb-2">
-              Projects
-            </div>
-            <div className="space-y-3">
-              {resume.projects.map((proj) => (
-                <div key={proj.id} className="space-y-1">
-                  <div className="flex justify-between text-xs font-bold text-slate-900">
-                    <span>{proj.title} <span className="font-normal text-slate-500">[{proj.technologies.join(", ")}]</span></span>
-                    <span className="text-emerald-600">{proj.link}</span>
-                  </div>
-                  <ul className="list-disc pl-4 text-xs text-slate-700 space-y-1">
-                    {proj.bullets.map((b, i) => (
-                      <li key={i}>{b}</li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Education & Skills */}
         <div className="grid grid-cols-2 gap-4 pt-2">
           <div>
@@ -574,9 +538,16 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
               Education
             </div>
             {resume.education.map((edu) => (
-              <div key={edu.id} className="text-xs">
+              <div key={edu.id} className="text-xs space-y-1 mb-2">
                 <div className="font-bold text-slate-900">{edu.institution}</div>
                 <div className="text-slate-600">{edu.degree} in {edu.field}</div>
+                {edu.bullets && (
+                  <ul className="list-disc pl-4 text-[11px] text-slate-600 space-y-0.5">
+                    {edu.bullets.map((b, i) => (
+                      <li key={i}>{b}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             ))}
           </div>
@@ -616,17 +587,15 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
           <div className="p-1 rounded-xl bg-slate-800 border border-slate-700 flex items-center">
             <button
               onClick={() => setActiveTab("edit")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                activeTab === "edit" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${activeTab === "edit" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"
+                }`}
             >
               <Edit3 className="w-3.5 h-3.5" /> Edit Form
             </button>
             <button
               onClick={() => setActiveTab("preview")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                activeTab === "preview" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${activeTab === "preview" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"
+                }`}
             >
               <Eye className="w-3.5 h-3.5" /> Live Preview
             </button>
@@ -644,7 +613,7 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
           <button
             onClick={downloadTextResume}
             className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition-all flex items-center gap-1.5"
-            title="Download Plain Text Resume (.txt) for ATS Copy/Paste"
+            title="Download Plain Text Resume (.txt)"
           >
             <FileText className="w-4 h-4 text-emerald-400" />
             <span>Download .TXT</span>
@@ -653,7 +622,7 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
           <button
             onClick={handleBrowserPrint}
             className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold transition-all flex items-center gap-1.5"
-            title="Print or Save via Browser Print Dialog"
+            title="Print Dialog"
           >
             <Printer className="w-4 h-4" />
           </button>
@@ -714,14 +683,14 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
               </div>
             </div>
 
-            {/* Summary Box */}
+            {/* Summary Box with Example Placeholder & AI Enhancer */}
             <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-base text-slate-900 dark:text-white">Professional Summary</h3>
                 <button
                   type="button"
                   onClick={handleEnhanceSummary}
-                  className="px-3 py-1 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40 text-xs font-semibold flex items-center gap-1.5 hover:bg-blue-100"
+                  className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40 text-xs font-semibold flex items-center gap-1.5 hover:bg-blue-100 transition-colors"
                 >
                   {enhancingIndex === -1 ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
                   <span>AI Enhance Summary</span>
@@ -731,46 +700,126 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
                 rows={4}
                 value={resume.summary}
                 onChange={(e) => setResume({ ...resume, summary: e.target.value })}
-                className="w-full p-3 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none leading-relaxed text-slate-800 dark:text-slate-200"
+                placeholder="Example: Results-driven Software Engineer with 2+ years of experience building high-throughput Node.js microservices and React frontends. Proficient in TypeScript, PostgreSQL, and Cloud infrastructure..."
+                className="w-full p-3.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none leading-relaxed text-slate-800 dark:text-slate-200"
               />
             </div>
 
             {/* Experience Box */}
             <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
-              <h3 className="font-bold text-base text-slate-900 dark:text-white">Work Experience & Internships</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">Work Experience & Internships</h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newExp = {
+                      id: "exp_" + Date.now(),
+                      company: "New Company",
+                      role: user?.targetCareer || "Software Engineering Intern",
+                      location: "Remote",
+                      startDate: "2024",
+                      endDate: "Present",
+                      current: true,
+                      bullets: [
+                        "Architected scalable feature modules and API endpoints using modern software engineering patterns.",
+                      ],
+                    };
+                    setResume({ ...resume, experience: [...(resume.experience || []), newExp] });
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-xs flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Experience</span>
+                </button>
+              </div>
 
-              {resume.experience.map((exp, expIdx) => (
-                <div key={exp.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 space-y-3">
+              {(resume.experience || []).map((exp, expIdx) => (
+                <div key={exp.id || expIdx} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="grid grid-cols-2 gap-2 flex-1">
+                      <input
+                        type="text"
+                        placeholder="Company"
+                        value={exp.company}
+                        onChange={(e) => {
+                          const updated = [...resume.experience];
+                          updated[expIdx].company = e.target.value;
+                          setResume({ ...resume, experience: updated });
+                        }}
+                        className="px-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-bold"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Role Title"
+                        value={exp.role}
+                        onChange={(e) => {
+                          const updated = [...resume.experience];
+                          updated[expIdx].role = e.target.value;
+                          setResume({ ...resume, experience: updated });
+                        }}
+                        className="px-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-bold"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = resume.experience.filter((_, i) => i !== expIdx);
+                        setResume({ ...resume, experience: updated });
+                      }}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                      title="Delete Experience Entry"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-2">
                     <input
                       type="text"
-                      placeholder="Company"
-                      value={exp.company}
+                      placeholder="Start Date (e.g. Jun 2023)"
+                      value={exp.startDate}
                       onChange={(e) => {
                         const updated = [...resume.experience];
-                        updated[expIdx].company = e.target.value;
+                        updated[expIdx].startDate = e.target.value;
                         setResume({ ...resume, experience: updated });
                       }}
-                      className="px-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                      className="px-3 py-1 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                     />
                     <input
                       type="text"
-                      placeholder="Role Title"
-                      value={exp.role}
+                      placeholder="End Date (e.g. Present)"
+                      value={exp.endDate}
                       onChange={(e) => {
                         const updated = [...resume.experience];
-                        updated[expIdx].role = e.target.value;
+                        updated[expIdx].endDate = e.target.value;
                         setResume({ ...resume, experience: updated });
                       }}
-                      className="px-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                      className="px-3 py-1 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                     />
                   </div>
 
                   {/* Bullet Points */}
-                  <div className="space-y-2">
-                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Bullet Points</div>
-                    {exp.bullets.map((bullet, bIdx) => (
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <span>Experience Bullet Points</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = [...resume.experience];
+                          updated[expIdx].bullets = [...(updated[expIdx].bullets || []), "Implemented scalable feature module improving execution speed by 25%."];
+                          setResume({ ...resume, experience: updated });
+                        }}
+                        className="text-blue-500 hover:underline flex items-center gap-1 text-[11px] font-bold lowercase"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>add bullet</span>
+                      </button>
+                    </div>
+
+                    {(exp.bullets || []).map((bullet, bIdx) => (
                       <div key={bIdx} className="flex items-center gap-2">
+                        <span className="text-slate-400 font-bold text-xs">•</span>
                         <input
                           type="text"
                           value={bullet}
@@ -793,11 +842,259 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
                             <Wand2 className="w-3.5 h-3.5" />
                           )}
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = [...resume.experience];
+                            updated[expIdx].bullets = updated[expIdx].bullets.filter((_, i) => i !== bIdx);
+                            setResume({ ...resume, experience: updated });
+                          }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                          title="Remove Bullet"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     ))}
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Education Box with Bullet Points */}
+            <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">Education & Academic Background</h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newEdu = {
+                      id: "edu_" + Date.now(),
+                      institution: "University / College Name",
+                      degree: "BS",
+                      field: "Computer Science",
+                      startDate: "2022",
+                      endDate: "2026",
+                      gpa: "3.8/4.0",
+                      bullets: [
+                        "Dean's Honor List for outstanding academic excellence.",
+                        "Relevant Coursework: Data Structures, Algorithms, Distributed Systems, Software Engineering."
+                      ]
+                    };
+                    setResume({ ...resume, education: [...(resume.education || []), newEdu] });
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-xs flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Education</span>
+                </button>
+              </div>
+
+              {(resume.education || []).map((edu, eduIdx) => (
+                <div key={edu.id || eduIdx} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <input
+                      type="text"
+                      placeholder="University / Institution Name"
+                      value={edu.institution}
+                      onChange={(e) => {
+                        const updated = [...resume.education];
+                        updated[eduIdx].institution = e.target.value;
+                        setResume({ ...resume, education: updated });
+                      }}
+                      className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-bold"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = resume.education.filter((_, i) => i !== eduIdx);
+                        setResume({ ...resume, education: updated });
+                      }}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                      title="Delete Education Entry"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Degree (e.g. BS)"
+                      value={edu.degree}
+                      onChange={(e) => {
+                        const updated = [...resume.education];
+                        updated[eduIdx].degree = e.target.value;
+                        setResume({ ...resume, education: updated });
+                      }}
+                      className="px-3 py-1 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Field of Study (e.g. Computer Science)"
+                      value={edu.field}
+                      onChange={(e) => {
+                        const updated = [...resume.education];
+                        updated[eduIdx].field = e.target.value;
+                        setResume({ ...resume, education: updated });
+                      }}
+                      className="px-3 py-1 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Start Year"
+                      value={edu.startDate}
+                      onChange={(e) => {
+                        const updated = [...resume.education];
+                        updated[eduIdx].startDate = e.target.value;
+                        setResume({ ...resume, education: updated });
+                      }}
+                      className="px-3 py-1 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                    />
+                    <input
+                      type="text"
+                      placeholder="End Year"
+                      value={edu.endDate}
+                      onChange={(e) => {
+                        const updated = [...resume.education];
+                        updated[eduIdx].endDate = e.target.value;
+                        setResume({ ...resume, education: updated });
+                      }}
+                      className="px-3 py-1 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                    />
+                    <input
+                      type="text"
+                      placeholder="GPA / Grade"
+                      value={edu.gpa}
+                      onChange={(e) => {
+                        const updated = [...resume.education];
+                        updated[eduIdx].gpa = e.target.value;
+                        setResume({ ...resume, education: updated });
+                      }}
+                      className="px-3 py-1 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+
+                  {/* Education Bullet Points */}
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <span>Coursework & Honors Bullet Points</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = [...resume.education];
+                          const bullets = updated[eduIdx].bullets || [];
+                          updated[eduIdx].bullets = [...bullets, "Relevant Coursework: Data Structures, Algorithms, Software Architecture."];
+                          setResume({ ...resume, education: updated });
+                        }}
+                        className="text-blue-500 hover:underline flex items-center gap-1 text-[11px] font-bold lowercase"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>add bullet</span>
+                      </button>
+                    </div>
+
+                    {(edu.bullets || []).map((bullet, bIdx) => (
+                      <div key={bIdx} className="flex items-center gap-2">
+                        <span className="text-slate-400 font-bold text-xs">•</span>
+                        <input
+                          type="text"
+                          value={bullet}
+                          onChange={(e) => {
+                            const updated = [...resume.education];
+                            if (!updated[eduIdx].bullets) updated[eduIdx].bullets = [];
+                            updated[eduIdx].bullets![bIdx] = e.target.value;
+                            setResume({ ...resume, education: updated });
+                          }}
+                          className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = [...resume.education];
+                            if (updated[eduIdx].bullets) {
+                              updated[eduIdx].bullets = updated[eduIdx].bullets!.filter((_, i) => i !== bIdx);
+                              setResume({ ...resume, education: updated });
+                            }
+                          }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                          title="Remove Bullet"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Technical Skills Categorized Form */}
+            <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+              <h3 className="font-bold text-base text-slate-900 dark:text-white">Technical Skills & Categories</h3>
+              <p className="text-xs text-slate-400">Separate technologies with commas (e.g. JavaScript, TypeScript, Python)</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Programming Languages</label>
+                  <input
+                    type="text"
+                    placeholder="JavaScript, TypeScript, Python, C++, SQL"
+                    value={(resume.skills?.languages || []).join(", ")}
+                    onChange={(e) => {
+                      const list = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
+                      setResume({ ...resume, skills: { ...resume.skills, languages: list } });
+                    }}
+                    className="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Frameworks & Libraries</label>
+                  <input
+                    type="text"
+                    placeholder="React, Next.js, Node.js, Express, Tailwind CSS"
+                    value={(resume.skills?.frameworks || []).join(", ")}
+                    onChange={(e) => {
+                      const list = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
+                      setResume({ ...resume, skills: { ...resume.skills, frameworks: list } });
+                    }}
+                    className="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Databases & Caching</label>
+                  <input
+                    type="text"
+                    placeholder="PostgreSQL, MongoDB, Redis, MySQL"
+                    value={(resume.skills?.databases || []).join(", ")}
+                    onChange={(e) => {
+                      const list = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
+                      setResume({ ...resume, skills: { ...resume.skills, databases: list } });
+                    }}
+                    className="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">DevOps & Developer Tools</label>
+                  <input
+                    type="text"
+                    placeholder="Git, GitHub, Docker, Postman, Linux CLI, Vercel"
+                    value={(resume.skills?.tools || []).join(", ")}
+                    onChange={(e) => {
+                      const list = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
+                      setResume({ ...resume, skills: { ...resume.skills, tools: list } });
+                    }}
+                    className="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -816,11 +1113,10 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
                     key={tpl.name}
                     type="button"
                     onClick={() => setResume({ ...resume, template: tpl.name as any })}
-                    className={`p-3 rounded-xl border text-xs text-left transition-all ${
-                      resume.template === tpl.name
+                    className={`p-3 rounded-xl border text-xs text-left transition-all ${resume.template === tpl.name
                         ? "bg-blue-600 text-white border-blue-600 font-bold shadow-md shadow-blue-600/30"
                         : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400"
-                    }`}
+                      }`}
                   >
                     <div className="font-bold">{tpl.name}</div>
                     <div className="text-[10px] opacity-80 font-normal mt-0.5">{tpl.desc}</div>
@@ -842,11 +1138,10 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
                 <button
                   key={preset}
                   onClick={() => setResume({ ...resume, template: preset as any })}
-                  className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all ${
-                    resume.template === preset
+                  className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all ${resume.template === preset
                       ? "bg-blue-600 text-white"
                       : "bg-slate-800 text-slate-400 hover:text-white"
-                  }`}
+                    }`}
                 >
                   {preset}
                 </button>
@@ -860,4 +1155,3 @@ Dev Tools: ${(resume.skills?.tools || []).join(', ')}
     </div>
   );
 };
-

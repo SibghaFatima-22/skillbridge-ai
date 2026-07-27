@@ -9,110 +9,144 @@ import { ResourcesView } from "./components/resources/ResourcesView";
 import { ResumeBuilderView } from "./components/resume/ResumeBuilderView";
 import { ResumeAnalyzerView } from "./components/resume/ResumeAnalyzerView";
 import { InterviewCoachView } from "./components/interview/InterviewCoachView";
-import { JobMatcherView } from "./components/jobmatcher/JobMatcherView";
 import { GithubAnalyzerView } from "./components/github/GithubAnalyzerView";
 import { AIMentorView } from "./components/mentor/AIMentorView";
-import { AnalyticsView } from "./components/analytics/AnalyticsView";
-import { AchievementsView } from "./components/achievements/AchievementsView";
 import { ProfileView } from "./components/profile/ProfileView";
-import { SettingsView } from "./components/settings/SettingsView";
-import { AdminDashboardView } from "./components/admin/AdminDashboardView";
+import { AuthModal } from "./components/auth/AuthModal";
 
-import { NotificationItem } from "./types";
+import { NotificationItem, UserProfile } from "./types";
 import {
   storage,
-  initialUserProfile,
-  initialAssessmentData,
-  initialRoadmapData,
-  initialResourceItems,
-  initialResumeData,
-  initialJobMatches,
-  initialNotifications,
-  initialBadges,
+  PRESET_USERS,
 } from "./lib/storage";
-import { auth, onSnapshot, doc, db } from "./lib/firebase";
+import { auth, onAuthStateChanged, getUserProfileFromFirestore, logoutUser } from "./lib/firebase";
 import {
   syncUserWithFirestore,
-  syncRoadmapWithFirestore,
   syncAssessmentWithFirestore,
+  syncRoadmapWithFirestore,
   syncResumeWithFirestore,
+  fetchUserDataFromFirestore,
+  calculateAndSaveCareerReadiness,
 } from "./lib/firebaseSync";
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<string>("dashboard");
-  const [user, setUser] = useState(initialUserProfile);
-  const [assessment, setAssessment] = useState(initialAssessmentData);
-  const [roadmap, setRoadmap] = useState(initialRoadmapData);
-  const [resources, setResources] = useState(initialResourceItems);
-  const [resume, setResume] = useState(initialResumeData);
-  const [jobs, setJobs] = useState(initialJobMatches);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(() => storage.getNotifications());
-  const [badges, setBadges] = useState(initialBadges);
+  // Default to landing page on site start
+  const [activeTab, setActiveTab] = useState<string>("landing");
+
+  // Multi-User Candidate State Management initialized from current active ID
+  const [user, setUser] = useState<UserProfile>(() => {
+    const currentId = storage.getCurrentUserId();
+    return storage.getUserProfile(currentId);
+  });
+  const [assessment, setAssessment] = useState(() => storage.getUserAssessment(user.id));
+  const [roadmap, setRoadmap] = useState(() => storage.getUserRoadmap(user.id));
+  const [resume, setResume] = useState(() => storage.getUserResume(user.id));
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => storage.getNotifications(user.id));
+
+  // Auth Modal state
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // Logout: sign out of Firebase and reset app state
+  const handleLogout = useCallback(async () => {
+    await logoutUser();
+    storage.setCurrentUserId("");
+    const defaultUser = storage.getUserProfile("");
+    setUser(defaultUser);
+    setAssessment(storage.getUserAssessment(""));
+    setRoadmap(storage.getUserRoadmap(""));
+    setResume(storage.getUserResume(""));
+    setNotifications([]);
+    setActiveTab("landing");
+  }, []);
+
+  // Switch candidate user handler with full Firestore load
+  const handleSwitchUser = useCallback(async (newUser: UserProfile) => {
+    setUser(newUser);
+    storage.setUserProfile(newUser);
+    storage.setCurrentUserId(newUser.id);
+    await syncUserWithFirestore(newUser.id, newUser);
+
+    // 1. Load local candidate storage
+    const loadedAssessment = storage.getUserAssessment(newUser.id);
+    const loadedRoadmap = storage.getUserRoadmap(newUser.id);
+    const loadedResume = storage.getUserResume(newUser.id);
+    const loadedNotifs = storage.getNotifications(newUser.id);
+
+    setAssessment(loadedAssessment);
+    setRoadmap(loadedRoadmap);
+    setResume(loadedResume);
+    setNotifications(loadedNotifs);
+
+    // 2. Fetch remote candidate data from Firestore if available
+    const remoteData = await fetchUserDataFromFirestore(newUser.id);
+    if (remoteData) {
+      if (remoteData.user) {
+        setUser(remoteData.user);
+        storage.setUserProfile(remoteData.user);
+      }
+      if (remoteData.assessment) {
+        setAssessment(remoteData.assessment);
+        storage.setUserAssessment(newUser.id, remoteData.assessment);
+      }
+      if (remoteData.roadmap) {
+        setRoadmap(remoteData.roadmap);
+        storage.setUserRoadmap(newUser.id, remoteData.roadmap);
+      }
+      if (remoteData.resume) {
+        setResume(remoteData.resume);
+        storage.setUserResume(newUser.id, remoteData.resume);
+      }
+    }
+
+    // Switch view to dashboard on successful login / profile switch
+    setActiveTab("dashboard");
+  }, []);
+
+  // Sync Firebase Auth state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        const localProfile = storage.getUserProfile(fbUser.uid);
+        if (localProfile && localProfile.email === fbUser.email) {
+          handleSwitchUser(localProfile);
+        } else {
+          // Fetch from Firestore
+          const remoteProfile = await getUserProfileFromFirestore(fbUser.uid);
+          if (remoteProfile) {
+            handleSwitchUser(remoteProfile as UserProfile);
+          }
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [handleSwitchUser]);
 
   const handleSetNotifications = useCallback((newNotifs: NotificationItem[]) => {
     setNotifications(newNotifs);
-    storage.setNotifications(newNotifs);
-  }, []);
+    storage.setNotifications(newNotifs, user.id);
+  }, [user.id]);
 
-  const addNotification = useCallback((title: string, message: string, type: "info" | "success" | "warning" | "achievement" = "info") => {
-    const newNotif: NotificationItem = {
-      id: "notif_" + Date.now(),
-      title,
-      message,
-      type,
-      read: false,
-      createdAt: new Date().toISOString(),
-    };
-    setNotifications((prev) => {
-      const updated = [newNotif, ...prev];
-      storage.setNotifications(updated);
-      return updated;
-    });
-  }, []);
+  const addNotification = useCallback(
+    (title: string, message: string, type: "info" | "success" | "warning" | "achievement" = "info") => {
+      const newNotif: NotificationItem = {
+        id: "notif_" + Date.now(),
+        title,
+        message,
+        type,
+        read: false,
+        createdAt: new Date().toISOString(),
+      };
+      setNotifications((prev) => {
+        const updated = [newNotif, ...prev];
+        storage.setNotifications(updated, user.id);
+        return updated;
+      });
+    },
+    [user.id]
+  );
 
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-
-  // Sync state with Firestore on initial load & Auth changes
-  useEffect(() => {
-    const unsubscribeAuth = auth.onAuthStateChanged((firebaseUser) => {
-      if (firebaseUser) {
-        setUser((prev) => ({
-          ...prev,
-          id: firebaseUser.uid,
-          fullName: firebaseUser.displayName || prev.fullName,
-          email: firebaseUser.email || prev.email,
-          photoURL: firebaseUser.photoURL || prev.photoURL,
-        }));
-      }
-    });
-    return () => unsubscribeAuth();
-  }, []);
-
-  // Listen to live Firestore changes for user profile.
-  // NOTE: this listener can fire independently of any user interaction
-  // (e.g. any write to this doc from another tab/session, or the initial
-  // sync-on-create branch below). Every fire calls setUser, which
-  // re-renders the whole App tree. Without memoized children (fixed below
-  // via useCallback + React.memo on the heavy views), that re-render was
-  // cascading into a full re-execution of whichever tab was mounted
-  // (e.g. the 8-step AssessmentWizard), which is what caused the
-  // "noticeable delay before it highlights" when a star click happened
-  // to land while one of these unrelated re-renders was in flight.
-  useEffect(() => {
-    if (!user.id) return;
-    const userRef = doc(db, "users", user.id);
-    const unsubscribeDoc = onSnapshot(userRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const firestoreData = snapshot.data();
-        setUser((prev) => ({ ...prev, ...firestoreData }));
-      } else {
-        // First time initialization in Firestore
-        syncUserWithFirestore(user.id, user);
-      }
-    });
-    return () => unsubscribeDoc();
-  }, [user.id]);
 
   useEffect(() => {
     if (theme === "dark") {
@@ -122,33 +156,93 @@ export function App() {
     }
   }, [theme]);
 
-  // Stabilized callback props. Previously these were inline arrow
-  // functions re-created on every App render, which defeats any child
-  // memoization and forces prop-identity-based effects/renders downstream
-  // to fire more often than necessary.
-  const handleSetAssessment = useCallback((newAsm: typeof assessment) => {
-    setAssessment(newAsm);
-    setUser((u) => {
-      const updated = { ...u, careerReadiness: newAsm.careerReadiness };
-      syncUserWithFirestore(u.id, updated);
-      return updated;
-    });
-    syncAssessmentWithFirestore(user.id, newAsm);
-  }, [user.id]);
+  const handleSetUser = useCallback((updatedUser: UserProfile) => {
+    setUser(updatedUser);
+    storage.setUserProfile(updatedUser);
+    storage.setCurrentUserId(updatedUser.id);
+    syncUserWithFirestore(updatedUser.id, updatedUser);
+  }, []);
 
-  const handleSetRoadmap = useCallback((newRdm: typeof roadmap) => {
-    setRoadmap(newRdm);
-    syncRoadmapWithFirestore(user.id, newRdm);
-  }, [user.id]);
+  const handleSetAssessment = useCallback(
+    async (newAsm: typeof assessment) => {
+      setAssessment(newAsm);
+      storage.setUserAssessment(user.id, newAsm);
+      await syncAssessmentWithFirestore(user.id, newAsm);
 
-  const handleSetResume = useCallback((newResume: typeof resume) => {
-    setResume(newResume);
-    syncResumeWithFirestore(user.id, newResume);
-  }, [user.id]);
+      // Recalculate Career Readiness Score & sync to Firestore
+      const newReadiness = await calculateAndSaveCareerReadiness(
+        user.id,
+        user,
+        newAsm,
+        roadmap,
+        resume
+      );
 
-  // If activeTab is landing, show full public landing page
+      setUser((u) => {
+        const updated = { ...u, careerReadiness: newReadiness };
+        storage.setUserProfile(updated);
+        return updated;
+      });
+    },
+    [user, roadmap, resume]
+  );
+
+  const handleSetRoadmap = useCallback(
+    async (newRdm: typeof roadmap) => {
+      setRoadmap(newRdm);
+      storage.setUserRoadmap(user.id, newRdm);
+      await syncRoadmapWithFirestore(user.id, newRdm);
+
+      // Recalculate Career Readiness Score & sync to Firestore
+      const newReadiness = await calculateAndSaveCareerReadiness(
+        user.id,
+        user,
+        assessment,
+        newRdm,
+        resume
+      );
+
+      setUser((u) => {
+        const updated = { ...u, careerReadiness: newReadiness };
+        storage.setUserProfile(updated);
+        return updated;
+      });
+    },
+    [user, assessment, resume]
+  );
+
+  const handleSetResume = useCallback(
+    async (newResume: typeof resume) => {
+      setResume(newResume);
+      storage.setUserResume(user.id, newResume);
+      await syncResumeWithFirestore(user.id, newResume);
+
+      // Recalculate Career Readiness Score & sync to Firestore
+      const newReadiness = await calculateAndSaveCareerReadiness(
+        user.id,
+        user,
+        assessment,
+        roadmap,
+        newResume
+      );
+
+      setUser((u) => {
+        const updated = { ...u, careerReadiness: newReadiness };
+        storage.setUserProfile(updated);
+        return updated;
+      });
+    },
+    [user, assessment, roadmap]
+  );
+
+  // Public Landing Page
   if (activeTab === "landing") {
-    return <LandingPage onGetStarted={() => setActiveTab("dashboard")} />;
+    return (
+      <LandingPage
+        isLoggedIn={Boolean(user && user.fullName)}
+        onGetStarted={() => setActiveTab("dashboard")}
+      />
+    );
   }
 
   return (
@@ -175,6 +269,8 @@ export function App() {
             theme={theme}
             setTheme={setTheme}
             setIsMobileOpen={setIsMobileOpen}
+            onOpenAuthModal={() => setIsAuthModalOpen(true)}
+            onLogout={handleLogout}
           />
 
           {/* Dynamic View Container */}
@@ -184,7 +280,6 @@ export function App() {
                 user={user}
                 assessment={assessment}
                 roadmap={roadmap}
-                jobs={jobs}
                 setActiveTab={setActiveTab}
               />
             )}
@@ -197,6 +292,7 @@ export function App() {
                 setRoadmap={handleSetRoadmap}
                 setActiveTab={setActiveTab}
                 addNotification={addNotification}
+                user={user}
               />
             )}
 
@@ -210,46 +306,48 @@ export function App() {
             )}
 
             {activeTab === "resources" && (
-              <ResourcesView resources={resources} setResources={setResources} />
+              <ResourcesView user={user} />
             )}
 
             {activeTab === "resume-builder" && (
               <ResumeBuilderView
                 resume={resume}
                 setResume={handleSetResume}
+                user={user}
               />
             )}
 
-            {activeTab === "resume-analyzer" && <ResumeAnalyzerView addNotification={addNotification} />}
-
-            {activeTab === "interview" && <InterviewCoachView addNotification={addNotification} />}
-
-            {activeTab === "job-matcher" && (
-              <JobMatcherView jobs={jobs} setJobs={setJobs} />
+            {activeTab === "resume-analyzer" && (
+              <ResumeAnalyzerView addNotification={addNotification} />
             )}
 
-            {activeTab === "github" && <GithubAnalyzerView user={user} setActiveTab={setActiveTab} addNotification={addNotification} />}
+            {activeTab === "interview" && (
+              <InterviewCoachView addNotification={addNotification} user={user} />
+            )}
 
-            {activeTab === "mentor" && <AIMentorView />}
+            {activeTab === "github" && (
+              <GithubAnalyzerView user={user} setActiveTab={setActiveTab} addNotification={addNotification} />
+            )}
 
-            {activeTab === "analytics" && <AnalyticsView user={user} />}
-
-            {activeTab === "achievements" && (
-              <AchievementsView user={user} badges={badges} />
+            {activeTab === "mentor" && (
+              <AIMentorView user={user} />
             )}
 
             {activeTab === "profile" && (
-              <ProfileView user={user} setUser={setUser} />
+              <ProfileView user={user} setUser={handleSetUser} />
             )}
-
-            {activeTab === "settings" && (
-              <SettingsView theme={theme} setTheme={setTheme} />
-            )}
-
-            {activeTab === "admin" && <AdminDashboardView />}
           </main>
         </div>
       </div>
+
+      {/* Auth & Multi-User Switcher Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSelectUser={handleSwitchUser}
+        currentUser={user}
+        presetUsers={PRESET_USERS}
+      />
     </div>
   );
 }

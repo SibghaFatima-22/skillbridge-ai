@@ -28,11 +28,11 @@ import { generateInterviewAPI, evaluateInterviewAnswerAPI, generateInterviewRepo
 
 interface InterviewCoachViewProps {
   addNotification?: (title: string, message: string, type?: "info" | "success" | "warning" | "achievement") => void;
+  user?: { targetCareer?: string };
 }
 
-export const InterviewCoachView: React.FC<InterviewCoachViewProps> = ({ addNotification }) => {
-  const [role, setRole] = useState("Backend Engineer");
-  const [type, setType] = useState<"Technical" | "Behavioral" | "System Design" | "Comprehensive Full Mock">("Comprehensive Full Mock");
+export const InterviewCoachView: React.FC<InterviewCoachViewProps> = ({ addNotification, user }) => {
+  const [role, setRole] = useState(user?.targetCareer || "Software Engineer");
   const [questionCountChoice, setQuestionCountChoice] = useState<number>(12);
   const [sessionStarted, setSessionStarted] = useState(false);
   const [sessionFinished, setSessionFinished] = useState(false);
@@ -248,7 +248,7 @@ export const InterviewCoachView: React.FC<InterviewCoachViewProps> = ({ addNotif
 
     const result = await generateInterviewAPI({
       targetRole: role,
-      interviewType: type === "Comprehensive Full Mock" ? "Technical & System Design & Behavioral" : type,
+      interviewType: "Technical & System Design & Behavioral",
       difficulty: "Intermediate",
       questionCount: questionCountChoice
     });
@@ -303,7 +303,7 @@ export const InterviewCoachView: React.FC<InterviewCoachViewProps> = ({ addNotif
       question: currentQ.question,
       userAnswer: textToEvaluate,
       targetRole: role,
-      interviewType: type,
+      interviewType: "Technical & Behavioral",
       keyPointsToCover: currentQ.keyPointsToCover || []
     });
 
@@ -403,7 +403,7 @@ export const InterviewCoachView: React.FC<InterviewCoachViewProps> = ({ addNotif
     try {
       const report = await generateInterviewReportAPI({
         targetRole: role,
-        interviewType: type,
+        interviewType: "Technical & Behavioral",
         questions,
         responses: responsesToUse
       });
@@ -432,9 +432,6 @@ export const InterviewCoachView: React.FC<InterviewCoachViewProps> = ({ addNotif
     const content = `=======================================================
 OFFICIAL AI INTERVIEW EVALUATION REPORT
 Target Role: ${role}
-Interview Format: ${type}
-Total Questions: ${questions.length}
-Time Elapsed: ${formatTimer(secondsElapsed)}
 =======================================================
 
 OVERALL SCORE: ${reportData.overallScore}%
@@ -571,26 +568,6 @@ Takeaway: ${q.keyTakeaway}
               placeholder="e.g. Backend Engineer, Full Stack Developer, Data Scientist..."
               className="w-full px-4 py-3 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none focus:border-amber-500 font-medium"
             />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Interview Format</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              {(["Comprehensive Full Mock", "Technical", "Behavioral", "System Design"] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setType(t)}
-                  className={`p-3 rounded-xl border text-xs font-bold transition-all text-center ${
-                    type === t
-                      ? "bg-amber-600 text-white border-amber-600 shadow-md"
-                      : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100"
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
           </div>
 
           <div>

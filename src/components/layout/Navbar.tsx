@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  Search,
   Bell,
   Sun,
   Moon,
@@ -9,8 +8,8 @@ import {
   CheckCheck,
   Briefcase,
   Trophy,
-  Flame,
-  X,
+  RefreshCw,
+  LogOut,
 } from "lucide-react";
 import { UserProfile, NotificationItem } from "../../types";
 
@@ -23,6 +22,8 @@ interface NavbarProps {
   theme: "light" | "dark";
   setTheme: (theme: "light" | "dark") => void;
   setIsMobileOpen: (open: boolean) => void;
+  onOpenAuthModal?: () => void;
+  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -33,9 +34,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   theme,
   setTheme,
   setIsMobileOpen,
+  onOpenAuthModal,
+  onLogout,
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -43,23 +45,10 @@ export const Navbar: React.FC<NavbarProps> = ({
     setNotifications(notifications.map((n) => ({ ...n, read: true })));
   };
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    const query = searchQuery.toLowerCase();
-    if (query.includes("resume")) setActiveTab("resume-builder");
-    else if (query.includes("interview")) setActiveTab("interview");
-    else if (query.includes("roadmap")) setActiveTab("roadmap");
-    else if (query.includes("job")) setActiveTab("job-matcher");
-    else if (query.includes("github")) setActiveTab("github");
-    else if (query.includes("resource")) setActiveTab("resources");
-    else setActiveTab("mentor");
-  };
-
   return (
     <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/40 backdrop-blur-md sticky top-0 z-30 px-4 md:px-8 flex items-center justify-between">
-      {/* Mobile Toggle & Search / Breadcrumb */}
-      <div className="flex items-center gap-3 flex-1 max-w-xl">
+      {/* Mobile Toggle & Active Context */}
+      <div className="flex items-center gap-3">
         <button
           onClick={() => setIsMobileOpen(true)}
           className="p-2 rounded-lg text-slate-600 dark:text-slate-300 md:hidden hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -67,26 +56,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           <Menu className="w-5 h-5" />
         </button>
 
-        <form onSubmit={handleSearchSubmit} className="relative w-full max-w-md">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-          <input
-            type="text"
-            placeholder="Search roadmaps, resume tips, jobs..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl bg-slate-100 dark:bg-slate-900/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800 focus:border-blue-500/50 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
-          />
-        </form>
+        <div className="hidden sm:flex items-center gap-2">
+          <span className="text-xs font-extrabold tracking-tight text-slate-900 dark:text-white uppercase">
+            Target Role:
+          </span>
+          <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold border border-blue-500/20">
+            {user.targetCareer || "Software Engineer"}
+          </span>
+        </div>
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-3">
-        {/* Streak Counter */}
-        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold">
-          <Flame className="w-4 h-4 fill-amber-500" />
-          <span>{user.currentStreak} Day Streak</span>
-        </div>
-
+      <div className="flex items-center gap-2 md:gap-3">
         {/* AI Mentor Quick Launch */}
         <button
           onClick={() => setActiveTab("mentor")}
@@ -95,6 +76,28 @@ export const Navbar: React.FC<NavbarProps> = ({
           <Sparkles className="w-3.5 h-3.5" />
           <span>Ask AI Mentor</span>
         </button>
+
+        {/* Account Switcher Button */}
+        <button
+          onClick={onOpenAuthModal}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 font-bold text-xs transition-all"
+          title="Switch Account or Sign In"
+        >
+          <RefreshCw className="w-3.5 h-3.5 text-blue-500" />
+          <span className="hidden sm:inline">Account</span>
+        </button>
+
+        {/* Logout Button */}
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-200 dark:border-red-800/60 text-red-600 dark:text-red-400 font-bold text-xs transition-all"
+            title="Logout"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Logout</span>
+          </button>
+        )}
 
         {/* Theme Toggle */}
         <button
@@ -105,7 +108,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {theme === "dark" ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
         </button>
 
-        {/* Notifications Dropdown */}
+        {/* Notifications */}
         <div className="relative">
           <button
             onClick={() => setShowNotifications(!showNotifications)}
@@ -113,7 +116,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Bell className="w-4 h-4" />
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-900" />
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-blue-500 ring-2 ring-white dark:ring-slate-900" />
             )}
           </button>
 
@@ -151,12 +154,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                           : "bg-blue-50/70 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/40 text-slate-900 dark:text-slate-100 font-medium"
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
-                          {notif.type === "achievement" && <Trophy className="w-3.5 h-3.5 text-amber-500" />}
-                          {notif.type === "info" && <Briefcase className="w-3.5 h-3.5 text-blue-500" />}
-                          {notif.title}
-                        </div>
+                      <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <Briefcase className="w-3.5 h-3.5 text-blue-500" />
+                        {notif.title}
                       </div>
                       <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">{notif.message}</p>
                     </div>
@@ -167,14 +167,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
 
-        {/* Profile Avatar Clickable */}
+        {/* Profile Avatar */}
         <button
           onClick={() => setActiveTab("profile")}
           className="flex items-center gap-2 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          title={user.fullName || "Candidate"}
         >
           <img
             src={user.photoURL}
-            alt={user.fullName}
+            alt={user.fullName || "User"}
             className="w-8 h-8 rounded-full object-cover ring-2 ring-blue-500/30"
           />
         </button>

@@ -14,6 +14,7 @@ import {
   FolderGit2,
   Loader2,
   Check,
+  ClipboardList,
 } from "lucide-react";
 import { RoadmapData, RoadmapTask, AssessmentData } from "../../types";
 import { generateRoadmapAPI } from "../../lib/api";
@@ -35,8 +36,37 @@ export const RoadmapView: React.FC<RoadmapViewProps> = ({
   setActiveTab,
   assessment,
 }) => {
+  // ── Assessment Gate ──────────────────────────────────────────────────────
+  const hasRoadmap = roadmap?.milestones && roadmap.milestones.length > 0;
+
+  if (!hasRoadmap) {
+    return (
+      <div className="max-w-3xl mx-auto py-20 flex flex-col items-center justify-center text-center space-y-6 pb-12">
+        <div className="p-6 rounded-3xl bg-blue-500/10 text-blue-500">
+          <Map className="w-14 h-14 mx-auto" />
+        </div>
+        <div className="space-y-3">
+          <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">
+            No Roadmap Generated Yet
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
+            Your personalized 12-week AI learning roadmap is generated automatically after you complete your <strong>Career Skill Assessment</strong>. Please complete the assessment first.
+          </p>
+        </div>
+        <button
+          onClick={() => setActiveTab("assessment")}
+          className="px-8 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-600/30 transition-all flex items-center gap-2"
+        >
+          <ClipboardList className="w-5 h-5" />
+          <span>Go to Career Assessment</span>
+        </button>
+      </div>
+    );
+  }
+
   const [openMilestone, setOpenMilestone] = useState<string>(roadmap.milestones[0]?.id || "");
   const [regenerating, setRegenerating] = useState(false);
+
 
   const toggleTask = (milestoneId: string, taskId: string) => {
     const updatedMilestones = roadmap.milestones.map((m) => {
