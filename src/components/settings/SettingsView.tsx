@@ -59,7 +59,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ theme, setTheme }) =
               <CheckCircle2 className="w-4 h-4 text-emerald-500" /> GEMINI_API_KEY Active (Server-Side Proxy)
             </div>
             <span className="text-[10px] font-mono bg-emerald-100 dark:bg-emerald-900/60 px-2 py-0.5 rounded text-emerald-800 dark:text-emerald-200">
-              const AI_MODEL = "gemini-2.5-flash-lite";
+              const AI_MODEL = "gemini-flash-latest";
             </span>
           </div>
         </div>
