@@ -264,7 +264,9 @@ skillbridge-ai/
 ```
 
 ---
+<div align="center">## Note
 
+All work in this repository was completed by me. Some commits appear under two different GitHub accounts because I switched GitHub accounts during development. Both accounts belong to me; there were no external contributors.</div>
 <div align="center">
   <p>Built with ❤️ using React, Google Gemini AI, and Firebase</p>
   <p><strong>Live at: <a href="https://skillbridge-ai-three-zeta.vercel.app/">skillbridge-ai-three-zeta.vercel.app</a></strong></p>
